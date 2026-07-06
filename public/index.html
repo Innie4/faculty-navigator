@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Faculty Navigator — Follow the line</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="landing">
+  <header class="site-header">
+    <span class="site-title">FACULTY NAVIGATOR</span>
+    <span class="site-tagline">UNIVERSITY OF UYO</span>
+  </header>
+
+  <main>
+    <!-- ── Hero ────────────────────────────────────────────── -->
+    <section class="hero">
+      <div class="hero-text">
+        <h1 class="hero-headline">
+          DON'T ASK A&nbsp;STRANGER.<br />FOLLOW THE&nbsp;LINE.
+          <svg
+            class="hero-underline"
+            viewBox="0 0 600 28"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5 14 Q 80 4 150 17 Q 220 28 300 10 Q 380 2 450 18 Q 520 27 595 8"
+              stroke="#d94f14"
+              stroke-width="5"
+              stroke-linecap="round"
+            />
+          </svg>
+        </h1>
+        <p class="hero-sub">
+          Faculty Navigator is a GPS-powered campus map that shows you how to
+          get where you&rsquo;re going. No wandering. No asking around. Just
+          open it, pick your destination, and walk the route.
+        </p>
+        <a href="/navigate.html" class="cta-button">OPEN THE MAP</a>
+      </div>
+
+      <div class="hero-visual">
+        <div id="mini-map"></div>
+      </div>
+    </section>
+
+    <!-- ── How it works ────────────────────────────────────── -->
+    <section class="steps">
+      <h2 class="section-headline">HOW IT WORKS</h2>
+      <div class="steps-grid">
+        <div class="step" style="--step-rotation: -1.2deg">
+          <span class="step-number">01</span>
+          <h3 class="step-title">OPEN</h3>
+          <p class="step-desc">
+            Let the app see your location. That&rsquo;s all the setup you
+            need&thinsp;—&thinsp;no account, no sign-up.
+          </p>
+        </div>
+        <div class="step" style="--step-rotation: 0.8deg">
+          <span class="step-number">02</span>
+          <h3 class="step-title">SEARCH</h3>
+          <p class="step-desc">
+            Type any building or facility name. Pick from the list that
+            appears.
+          </p>
+        </div>
+        <div class="step" style="--step-rotation: -0.5deg">
+          <span class="step-number">03</span>
+          <h3 class="step-title">WALK</h3>
+          <p class="step-desc">
+            A red line appears on the map. Follow it straight to your
+            destination.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Honest note ─────────────────────────────────────── -->
+    <section class="note-section">
+      <div class="note-box">
+        <h3 class="note-heading">What this isn&rsquo;t</h3>
+        <p class="note-text">
+          This isn&rsquo;t indoor navigation. GPS works outdoors with 3&ndash;10&nbsp;m
+          accuracy. You&rsquo;ll need to grant location permission when the app
+          asks. The map data was gathered by hand and may have gaps&thinsp;—&thinsp;if
+          something&rsquo;s wrong, it can be fixed. This is a student project,
+          not a commercial product.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Faculty Navigator&thinsp;—&thinsp;a student safety project. University of Uyo.</p>
+  </footer>
+
+  <!-- ── Mini preview map (Leaflet, no interaction) ────────── -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script>
+    (function () {
+      var map = L.map('mini-map', {
+        center: [5.0315, 7.9208],
+        zoom: 15,
+        zoomControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        attributionControl: false
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(map);
+    })();
+  </script>
+</body>
+</html>

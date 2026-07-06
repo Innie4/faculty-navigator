@@ -1,0 +1,19 @@
+{
+  "name": "faculty-navigator",
+  "version": "1.0.0",
+  "description": "GPS-driven campus navigation system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "mocha test/router.test.js test/server.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.5.2",
+    "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "mocha": "^10.8.0",
+    "supertest": "^7.2.2"
+  }
+}

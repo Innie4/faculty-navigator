@@ -1,0 +1,4 @@
+node_modules/
+faculty.db
+test/test-faculty.db
+.env

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
+  <title>Faculty Navigator — Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="navigate">
+  <div id="app">
+    <header class="nav-header">
+      <div class="nav-header-left">
+        <a href="/" class="nav-logo">FN</a>
+        <div class="gps-indicator" id="gps-indicator">
+          <span class="gps-dot state-locating" id="gps-dot"></span>
+          <span class="gps-label" id="gps-label">LOCATING</span>
+        </div>
+      </div>
+      <span class="nav-site-name">FACULTY NAVIGATOR</span>
+    </header>
+
+    <div class="search-container">
+      <input
+        type="text"
+        id="search-box"
+        placeholder="Where are you going?"
+        autocomplete="off"
+      />
+      <ul id="results-list"></ul>
+    </div>
+
+    <div id="map"></div>
+    <button id="locate-me" class="locate-btn" title="Re-centre on your position">⌖</button>
+
+    <div id="info-panel">
+      <span id="status">LOADING…</span>
+      <span id="distance"></span>
+      <button id="toggle-directions" class="info-btn" title="Directions" hidden>☰ ROUTE</button>
+      <button id="clear-route" class="info-btn" title="Clear route" hidden>✕</button>
+    </div>
+
+    <div id="directions-panel" class="directions-panel hidden">
+      <div class="directions-header">
+        <span class="directions-title">DIRECTIONS</span>
+        <button id="close-directions" class="directions-close-btn">✕</button>
+      </div>
+      <ol id="directions-list" class="directions-list"></ol>
+    </div>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="router.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

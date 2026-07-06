@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Faculty Navigator — Survey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="survey">
+  <div class="survey-page">
+    <header class="survey-header">
+      <h1>SURVEY</h1>
+      <a href="/" class="survey-link">back to home</a>
+    </header>
+
+    <!-- ── Live GPS readout ────────────────────────────── -->
+    <div class="gps-readout" id="gps-readout">
+      <div class="gps-coords" id="gps-coords">
+        <span id="gps-lat">--</span>&deg;N<br />
+        <span id="gps-lng">--</span>&deg;E
+      </div>
+      <div class="gps-accuracy" id="gps-accuracy">Accuracy: -- m</div>
+      <div class="gps-status-msg" id="gps-status">Waiting for GPS…</div>
+    </div>
+
+    <!-- ── Capture form ────────────────────────────────── -->
+    <form class="capture-form" id="capture-form">
+      <label for="point-name">Point name</label>
+      <input type="text" id="point-name" placeholder="e.g. CSC Block Entrance A" autocomplete="off" />
+
+      <label for="point-type">Type</label>
+      <select id="point-type">
+        <option value="building_entrance">Building Entrance</option>
+        <option value="junction">Junction</option>
+        <option value="gate">Gate</option>
+        <option value="turning_point">Turning Point</option>
+      </select>
+
+      <button type="submit" class="capture-btn" id="capture-btn">CAPTURE POINT</button>
+    </form>
+
+    <!-- ── Connect toggle ───────────────────────────────── -->
+    <div class="connect-toggle" id="connect-toggle" style="display:none;">
+      <input type="checkbox" id="connect-check" checked />
+      <label for="connect-check">Connect to previous point</label>
+      <select id="connect-surface">
+        <option value="paved">Paved</option>
+        <option value="earthen">Earthen</option>
+      </select>
+    </div>
+
+    <!-- ── Captured points list ─────────────────────────── -->
+    <div class="capture-list" id="capture-list">
+      <h2>CAPTURED POINTS</h2>
+      <div id="capture-items">
+        <div style="padding:var(--space-sm);color:var(--color-muted);font-size:0.82rem;">
+          No points captured yet.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Action buttons ───────────────────────────────── -->
+    <div class="action-row">
+      <button class="save-btn" id="save-btn" disabled>SAVE ALL TO DATABASE</button>
+      <button class="undo-btn" id="undo-btn" disabled>UNDO</button>
+    </div>
+
+    <div id="save-result"></div>
+
+    <div style="margin-top:var(--space-sm);padding:var(--space-xs) var(--space-sm);border:2px solid var(--color-border);background:var(--color-surface);font-size:0.75rem;display:flex;gap:var(--space-xs);align-items:center;">
+      <label for="survey-api-key" style="font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.08em;">API KEY</label>
+      <input type="text" id="survey-api-key" placeholder="Leave empty if unset" autocomplete="off" style="flex:1;padding:4px 8px;font-family:var(--font-body);font-size:0.8rem;border:2px solid var(--color-border);background:var(--color-bg);" />
+      <span id="survey-api-status" style="font-size:0.65rem;font-weight:700;">?</span>
+    </div>
+  </div>
+
+  <script>
+    /* ============================================================
+       survey.js — Field coordinate-capture tool
+       Works offline for the capture step; only needs a network
+       connection at "Save All to Database" time.
+       ============================================================ */
+
+    // ── State ────────────────────────────────────────────
+    var capturedNodes = [];   // { id, name, lat, lng, type, accuracy, ts }
+    var capturedEdges = [];   // { from_node_id, to_node_id, surface_type }
+    var gpsWatchId = null;
+    var currentLat = null;
+    var currentLng = null;
+    var currentAccuracy = null;
+
+    // ── DOM refs ─────────────────────────────────────────
+    var $ = function (id) { return document.getElementById(id); };
+    var latEl = $('gps-lat');
+    var lngEl = $('gps-lng');
+    var accEl = $('gps-accuracy');
+    var statusEl = $('gps-status');
+    var pointName = $('point-name');
+    var pointType = $('point-type');
+    var captureBtn = $('capture-btn');
+    var captureForm = $('capture-form');
+    var connectToggle = $('connect-toggle');
+    var connectCheck = $('connect-check');
+    var connectSurface = $('connect-surface');
+    var captureItems = $('capture-items');
+    var saveBtn = $('save-btn');
+    var undoBtn = $('undo-btn');
+    var saveResult = $('save-result');
+
+    // ── API key for write auth ──────────────────────────
+    var surveyApiKey = '';
+
+    $('survey-api-key').addEventListener('input', function () {
+      surveyApiKey = this.value.trim();
+      $('survey-api-status').textContent = surveyApiKey ? 'KEY SET' : 'OPEN';
+    });
+
+    function surveyAuthHeaders() {
+      var h = { 'Content-Type': 'application/json' };
+      if (surveyApiKey) h['x-api-key'] = surveyApiKey;
+      return h;
+    }
+
+    // ── Generate a URL-friendly ID from a name ───────────
+    function makeId(name) {
+      return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '') || 'point_' + Date.now();
+    }
+
+    // ── Render the captured points list ──────────────────
+    function renderList() {
+      if (capturedNodes.length === 0) {
+        captureItems.innerHTML =
+          '<div style="padding:var(--space-sm);color:var(--color-muted);font-size:0.82rem;">' +
+          'No points captured yet.</div>';
+        saveBtn.disabled = true;
+        undoBtn.disabled = true;
+        connectToggle.style.display = 'none';
+        return;
+      }
+
+      saveBtn.disabled = false;
+      undoBtn.disabled = false;
+      saveBtn.textContent = 'SAVE ALL TO DATABASE (' + capturedNodes.length + ' pts, ' +
+        capturedEdges.length + ' edges)';
+
+      // Show connect toggle when we have 2+ points
+      if (capturedNodes.length >= 2) {
+        connectToggle.style.display = 'flex';
+      }
+
+      var html = '';
+      for (var i = 0; i < capturedNodes.length; i++) {
+        var n = capturedNodes[i];
+        html += '<div class="capture-item">';
+        html += '<span class="ci-name">' + escapeHtml(n.name) + '</span>';
+        html += ' <span class="ci-type">(' + n.type.replace('_', ' ') + ')</span>';
+        html += '<br /><span class="ci-coords">' +
+          n.lat.toFixed(5) + ', ' + n.lng.toFixed(5) +
+          ' &plusmn;' + Math.round(n.accuracy) + 'm</span>';
+
+        // Find edges that start from this node
+        for (var j = 0; j < capturedEdges.length; j++) {
+          var e = capturedEdges[j];
+          if (e.from_node_id === n.id) {
+            var toNode = capturedNodes.find(function (x) { return x.id === e.to_node_id; });
+            if (toNode) {
+              html += '<span class="ci-edge">' +
+                escapeHtml(e.surface_type) + ' → ' +
+                escapeHtml(toNode.name) + '</span>';
+            }
+          }
+        }
+
+        html += '</div>';
+      }
+      captureItems.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Capture the current point ────────────────────────
+    captureForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      var nameVal = pointName.value.trim();
+      if (!nameVal) {
+        alert('Enter a name for this point.');
+        return;
+      }
+      if (currentLat === null || currentLng === null) {
+        alert('Waiting for GPS fix. Stand outside where the phone can see the sky.');
+        return;
+      }
+
+      var id = makeId(nameVal);
+      // Ensure unique ID within session
+      var suffix = 1;
+      var origId = id;
+      while (capturedNodes.some(function (n) { return n.id === id; })) {
+        id = origId + '_' + suffix++;
+      }
+
+      var node = {
+        id: id,
+        name: nameVal,
+        lat: currentLat,
+        lng: currentLng,
+        type: pointType.value,
+        accuracy: currentAccuracy,
+        ts: new Date().toISOString()
+      };
+
+      // Create edge to previous node if toggle is on
+      if (connectCheck.checked && capturedNodes.length > 0) {
+        var prev = capturedNodes[capturedNodes.length - 1];
+        capturedEdges.push({
+          from_node_id: prev.id,
+          to_node_id: id,
+          surface_type: connectSurface.value
+        });
+      }
+
+      capturedNodes.push(node);
+      pointName.value = '';
+      pointName.focus();
+      renderList();
+    });
+
+    // ── Undo last capture ────────────────────────────────
+    undoBtn.addEventListener('click', function () {
+      if (capturedNodes.length === 0) return;
+
+      var removed = capturedNodes.pop();
+      // Remove edges referencing the removed node
+      capturedEdges = capturedEdges.filter(function (e) {
+        return e.from_node_id !== removed.id && e.to_node_id !== removed.id;
+      });
+      renderList();
+    });
+
+    // ── Save to database ─────────────────────────────────
+    saveBtn.addEventListener('click', function () {
+      if (capturedNodes.length === 0) return;
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'SAVING…';
+      saveResult.innerHTML = '';
+
+      var payload = {
+        nodes: capturedNodes.map(function (n) {
+          return { id: n.id, name: n.name, lat: n.lat, lng: n.lng, type: n.type };
+        }),
+        edges: capturedEdges
+      };
+
+      fetch('/api/survey/batch', {
+        method: 'POST',
+        headers: surveyAuthHeaders(),
+        body: JSON.stringify(payload)
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            return res.json().then(function (err) {
+              throw new Error(err.error || 'Save failed (HTTP ' + res.status + ')');
+            });
+          }
+          return res.json();
+        })
+        .then(function (data) {
+          saveResult.className = 'save-result';
+          saveResult.textContent = 'Saved ' + data.nodes.length + ' nodes and ' +
+            data.edges.length + ' edges to database.';
+          // Clear session
+          capturedNodes = [];
+          capturedEdges = [];
+          renderList();
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'SAVE ALL TO DATABASE';
+        })
+        .catch(function (err) {
+          saveResult.className = 'save-result error';
+          saveResult.textContent = 'Error: ' + err.message +
+            ' — your captured data is still in the page. Try again when signal returns.';
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'SAVE ALL TO DATABASE (' + capturedNodes.length + ' pts)';
+        });
+    });
+
+    // ── GPS tracking ─────────────────────────────────────
+    function startGps() {
+      if (!navigator.geolocation) {
+        statusEl.textContent = 'Geolocation not available on this device.';
+        return;
+      }
+
+      gpsWatchId = navigator.geolocation.watchPosition(
+        function (pos) {
+          currentLat = pos.coords.latitude;
+          currentLng = pos.coords.longitude;
+          currentAccuracy = pos.coords.accuracy;
+
+          latEl.textContent = currentLat.toFixed(6);
+          lngEl.textContent = currentLng.toFixed(6);
+          accEl.textContent = 'Accuracy: ' + Math.round(currentAccuracy) + ' m';
+
+          if (currentAccuracy <= 5) {
+            statusEl.textContent = 'Signal: excellent';
+            statusEl.style.color = '#2d7d46';
+          } else if (currentAccuracy <= 10) {
+            statusEl.textContent = 'Signal: good';
+            statusEl.style.color = '#2d7d46';
+          } else if (currentAccuracy <= 20) {
+            statusEl.textContent = 'Signal: fair — wait for better fix';
+            statusEl.style.color = '#c93400';
+          } else {
+            statusEl.textContent = 'Signal: weak — move to open area';
+            statusEl.style.color = '#d94f14';
+          }
+        },
+        function (err) {
+          statusEl.textContent = 'GPS error: ' + err.message;
+          statusEl.style.color = '#d94f14';
+        },
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+      );
+    }
+
+    startGps();
+  </script>
+</body>
+</html>
