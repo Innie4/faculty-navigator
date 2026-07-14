@@ -1405,16 +1405,158 @@ body.survey { padding: 0; }
 .connectivity-list .bad { color: var(--color-accent); font-weight: 700; }
 
 /* — Building registry (admin.html) — */
-.admin-intro {
-  font-size: 0.85rem;
-  line-height: 1.7;
-  background: var(--color-accent-subtle);
+
+/* — Quest header — */
+.quest-head {
   border: var(--border-thick);
+  background: var(--color-text);
+  color: var(--color-surface);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  transform: rotate(-0.4deg);
+  box-shadow: var(--shadow-hard);
+}
+
+.quest-badge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  padding: 3px 9px;
+  border: var(--border-medium);
+  margin-bottom: var(--space-sm);
+}
+
+.quest-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 4vw, 1.9rem);
+  line-height: 1.05;
+  margin-bottom: var(--space-xs);
+}
+
+.quest-sub {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--color-accent-subtle);
+}
+
+/* — Category chips — */
+.cat-chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.cat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-sm) var(--space-xs);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.74rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-medium);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
+}
+
+.cat-chip:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-hard-sm); }
+
+.cat-chip.active {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.cat-emoji { font-size: 1.5rem; line-height: 1; }
+
+/* — Pin picker map — */
+.pin-card {
+  border: var(--border-thick);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
   padding: var(--space-sm);
   margin-bottom: var(--space-md);
 }
 
-.admin-intro strong { color: var(--color-accent); }
+.pin-hint {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  margin-bottom: var(--space-xs);
+  color: var(--color-accent);
+}
+
+.pin-map {
+  width: 100%;
+  height: 260px;
+  border: var(--border-medium);
+  background: var(--color-bg);
+  z-index: 0;
+}
+
+.coord-readout {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  text-align: center;
+  padding: var(--space-xs);
+  margin-top: var(--space-xs);
+  border: var(--border-medium);
+  background: var(--color-bg);
+}
+
+.coord-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.coord-inputs input {
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  border: var(--border-medium);
+  background: var(--color-bg);
+  -webkit-appearance: none;
+}
+
+/* — Big catchy add button — */
+.add-btn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: var(--border-thick);
+  box-shadow: var(--shadow-hard);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  transform: rotate(-0.6deg);
+}
+
+.add-btn:hover:not(:disabled) {
+  transform: rotate(0deg) translate(-3px, -3px);
+  box-shadow: 9px 9px 0 0 var(--color-border);
+}
+
+.add-btn:active:not(:disabled) {
+  transform: rotate(0deg) translate(2px, 2px);
+  box-shadow: 2px 2px 0 0 var(--color-border);
+}
+
+.add-btn:disabled { opacity: 0.6; cursor: default; }
 
 .building-form {
   background: var(--color-surface);
@@ -1517,6 +1659,8 @@ body.survey { padding: 0; }
 .building-card:last-child { margin-bottom: 0; }
 
 .bc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.bc-emoji { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
 
 .bc-name {
   font-family: var(--font-display);

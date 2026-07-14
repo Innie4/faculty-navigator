@@ -10,6 +10,12 @@
     href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap"
     rel="stylesheet"
   />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="admin">
@@ -20,146 +26,178 @@
       <a href="/" class="back-btn">&#8592; BACK</a>
     </header>
 
-    <p class="admin-intro">
-      Register a building by name and coordinates. Each entry is saved
-      <strong>twice</strong> &mdash; as a map point the navigator can route to,
-      and as a searchable place people can look up. The navigator just reads
-      these from the database.
-    </p>
-
-    <!-- ── API key bar ───────────────────────────────────── -->
-    <div class="apikey-bar">
-      <label for="api-key">API KEY</label>
-      <input type="text" id="api-key" placeholder="Leave empty if unset" autocomplete="off" />
-      <span id="api-status" class="apikey-status apikey-unknown">?</span>
+    <div class="quest-head">
+      <span class="quest-badge">QUEST</span>
+      <h2 class="quest-title">ADD A BUILDING TO THE MAP</h2>
+      <p class="quest-sub">Drop a pin, name it, tag it &mdash; boom, it&rsquo;s on the campus.</p>
     </div>
 
-    <!-- ── Building entry form ───────────────────────────── -->
+    <!-- ── Gamified building entry ─────────────────────── -->
     <form class="building-form" id="building-form">
-      <h2 class="form-head">ADD A BUILDING</h2>
-
-      <label for="b-name">Building name</label>
+      <h2 class="form-head">1 · NAME IT</h2>
+      <label for="b-name">What&rsquo;s it called?</label>
       <input type="text" id="b-name" placeholder="e.g. Faculty of Engineering" autocomplete="off" />
 
-      <div class="coord-grid">
-        <div>
-          <label for="b-lat">Latitude</label>
-          <input type="number" id="b-lat" step="any" placeholder="5.0315" />
-        </div>
-        <div>
-          <label for="b-lng">Longitude</label>
-          <input type="number" id="b-lng" step="any" placeholder="7.9208" />
+      <h2 class="form-head">2 · TAG IT</h2>
+      <div class="cat-chips" id="cat-chips">
+        <button type="button" class="cat-chip active" data-cat="building_entrance">
+          <span class="cat-emoji">&#127963;</span><span class="cat-label">Building</span>
+        </button>
+        <button type="button" class="cat-chip" data-cat="facility">
+          <span class="cat-emoji">&#127970;</span><span class="cat-label">Facility</span>
+        </button>
+        <button type="button" class="cat-chip" data-cat="landmark">
+          <span class="cat-emoji">&#128205;</span><span class="cat-label">Landmark</span>
+        </button>
+        <button type="button" class="cat-chip" data-cat="gate">
+          <span class="cat-emoji">&#128682;</span><span class="cat-label">Gate</span>
+        </button>
+      </div>
+
+      <h2 class="form-head">3 · DROP THE PIN</h2>
+      <div class="pin-card">
+        <div class="pin-hint" id="pin-hint">&#128205; TAP THE MAP TO DROP YOUR BUILDING</div>
+        <div id="admin-map" class="pin-map"></div>
+        <div class="coord-readout" id="coord-readout">No pin dropped yet</div>
+        <div class="coord-inputs">
+          <input type="number" id="b-lat" step="any" placeholder="latitude" />
+          <input type="number" id="b-lng" step="any" placeholder="longitude" />
+          <button type="button" class="locate-fill" id="locate-fill">&#9678; MY LOCATION</button>
         </div>
       </div>
 
-      <button type="button" class="locate-fill" id="locate-fill">⌖ USE MY LOCATION</button>
-
-      <label for="b-category">Category</label>
-      <select id="b-category">
-        <option value="building_entrance">Building</option>
-        <option value="facility">Facility</option>
-        <option value="landmark">Landmark</option>
-        <option value="gate">Gate</option>
-      </select>
-
-      <button type="submit" class="capture-btn" id="add-btn">SAVE BUILDING</button>
+      <button type="submit" class="add-btn" id="add-btn">&#128640; ADD TO CAMPUS</button>
       <div id="form-msg" class="form-msg"></div>
     </form>
 
-    <!-- ── Registered buildings list ─────────────────────── -->
+    <!-- ── Registered buildings list ───────────────────── -->
     <div class="admin-section">
-      <h2>REGISTERED BUILDINGS (<span id="b-count">0</span>)</h2>
+      <h2>COLLECTED BUILDINGS (<span id="b-count">0</span>)</h2>
       <div id="building-list" class="building-list">
-        <p class="empty-note">No buildings yet.</p>
+        <p class="empty-note">No buildings yet &mdash; go drop your first pin!</p>
       </div>
     </div>
   </div>
 
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
   <script>
     /* ============================================================
-       admin.js — Building registry admin page
-       Saves each building as BOTH a graph node (routable) and a
+       admin.js — Gamified building registry
+       Each building is saved as BOTH a graph node (routable) and a
        POI (searchable). The navigator reads both from the database.
        ============================================================ */
 
     var $ = function (id) { return document.getElementById(id); };
 
-    var apiKey = '';
-    var buildings = [];   // { node, poi }
-
-    /* ── API key ─────────────────────────────────────────── */
-    $('api-key').addEventListener('input', function () {
-      apiKey = this.value.trim();
-      var s = $('api-status');
-      s.textContent = apiKey ? 'KEY SET' : 'OPEN';
-      s.className = 'apikey-status ' + (apiKey ? 'apikey-set' : 'apikey-open');
-    });
-
-    function authHeaders() {
-      var h = { 'Content-Type': 'application/json' };
-      if (apiKey) h['x-api-key'] = apiKey;
-      return h;
-    }
-
-    /* ── Build a URL-friendly id from a name ─────────────── */
-    function makeId(name) {
-      return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'bld_' + Date.now();
-    }
+    var buildings = [];
+    var selectedCategory = 'building_entrance';
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    /* ── GPS auto-fill ───────────────────────────────────── */
+    function makeId(name) {
+      return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'bld_' + Date.now();
+    }
+
+    /* ── Category chips ─────────────────────────────────── */
+    $('cat-chips').querySelectorAll('.cat-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        selectedCategory = this.dataset.cat;
+        $('cat-chips').querySelectorAll('.cat-chip').forEach(function (c) {
+          c.classList.toggle('active', c === chip);
+        });
+      });
+    });
+
+    /* ── Mini map pin picker ────────────────────────────── */
+    var DEFAULT_CENTER = [5.0315, 7.9208];
+    var map = L.map('admin-map', { center: DEFAULT_CENTER, zoom: 15 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    var pinMarker = null;
+
+    function dropPin(lat, lng) {
+      if (pinMarker) map.removeLayer(pinMarker);
+      pinMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      pinMarker.on('dragend', function () {
+        var ll = pinMarker.getLatLng();
+        setCoords(ll.lat, ll.lng);
+      });
+      setCoords(lat, lng);
+    }
+
+    function setCoords(lat, lng) {
+      $('b-lat').value = lat.toFixed(6);
+      $('b-lng').value = lng.toFixed(6);
+      $('coord-readout').textContent = '📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+      $('pin-hint').textContent = '✓ PIN DROPPED — drag it to fine-tune';
+    }
+
+    map.on('click', function (e) { dropPin(e.latlng.lat, e.latlng.lng); });
+
+    /* ── Manual coord inputs also move the pin ──────────── */
+    function onCoordInput() {
+      var lat = parseFloat($('b-lat').value);
+      var lng = parseFloat($('b-lng').value);
+      if (!isNaN(lat) && !isNaN(lng)) dropPin(lat, lng);
+    }
+    $('b-lat').addEventListener('input', onCoordInput);
+    $('b-lng').addEventListener('input', onCoordInput);
+
+    /* ── GPS auto-fill ──────────────────────────────────── */
     $('locate-fill').addEventListener('click', function () {
       if (!navigator.geolocation) { alert('Geolocation not available.'); return; }
       this.textContent = '⌖ LOCATING…';
       navigator.geolocation.getCurrentPosition(
         function (pos) {
-          $('b-lat').value = pos.coords.latitude.toFixed(6);
-          $('b-lng').value = pos.coords.longitude.toFixed(6);
-          $('locate-fill').textContent = '⌖ USE MY LOCATION';
+          var lat = pos.coords.latitude, lng = pos.coords.longitude;
+          map.setView([lat, lng], 17);
+          dropPin(lat, lng);
+          $('locate-fill').textContent = '⌖ MY LOCATION';
         },
         function (err) {
           alert('Could not get location: ' + err.message);
-          $('locate-fill').textContent = '⌖ USE MY LOCATION';
+          $('locate-fill').textContent = '⌖ MY LOCATION';
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
     });
 
-    /* ── Add a building ──────────────────────────────────── */
+    /* ── Add a building (node + POI) ────────────────────── */
     $('building-form').addEventListener('submit', function (e) {
       e.preventDefault();
 
       var name = $('b-name').value.trim();
       var lat = parseFloat($('b-lat').value);
       var lng = parseFloat($('b-lng').value);
-      var category = $('b-category').value;
 
       var msg = $('form-msg');
       msg.className = 'form-msg';
       msg.textContent = '';
 
-      if (!name) { msg.textContent = 'Enter a building name.'; msg.className = 'form-msg error'; return; }
-      if (isNaN(lat) || isNaN(lng)) { msg.textContent = 'Enter valid latitude and longitude.'; msg.className = 'form-msg error'; return; }
+      if (!name) { msg.textContent = 'Give it a name first.'; msg.className = 'form-msg error'; return; }
+      if (isNaN(lat) || isNaN(lng)) { msg.textContent = 'Drop a pin or enter coordinates.'; msg.className = 'form-msg error'; return; }
 
+      var nodeType = selectedCategory === 'gate' ? 'gate' : 'building_entrance';
       var id = makeId(name);
       var suffix = 1, orig = id;
       while (buildings.some(function (b) { return b.node.id === id; })) id = orig + '_' + suffix++;
 
-      // Map the user-facing category onto a valid node type
-      var nodeType = category === 'gate' ? 'gate' : 'building_entrance';
-
       var addBtn = $('add-btn');
       addBtn.disabled = true;
-      addBtn.textContent = 'SAVING…';
+      addBtn.textContent = '⏳ SAVING…';
 
-      // 1) Save as a graph node (routable)
       fetch('/api/nodes', {
         method: 'POST',
-        headers: authHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: id, name: name, lat: lat, lng: lng, type: nodeType })
       })
         .then(function (r) {
@@ -167,10 +205,9 @@
           return r.json();
         })
         .then(function () {
-          // 2) Save as a POI (searchable) linked to the node
           return fetch('/api/pois', {
             method: 'POST',
-            headers: authHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name, node_id: id })
           }).then(function (r) {
             if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'POI save failed'); });
@@ -178,9 +215,16 @@
           });
         })
         .then(function () {
-          msg.textContent = 'Saved "' + name + '" as node + POI.';
+          msg.textContent = '✓ "' + name + '" is on the map!';
           msg.className = 'form-msg ok';
           $('building-form').reset();
+          if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; }
+          $('coord-readout').textContent = 'No pin dropped yet';
+          $('pin-hint').textContent = '📍 TAP THE MAP TO DROP YOUR BUILDING';
+          $('cat-chips').querySelectorAll('.cat-chip').forEach(function (c, i) {
+            c.classList.toggle('active', i === 0);
+          });
+          selectedCategory = 'building_entrance';
           loadBuildings();
         })
         .catch(function (err) {
@@ -189,11 +233,11 @@
         })
         .then(function () {
           addBtn.disabled = false;
-          addBtn.textContent = 'SAVE BUILDING';
+          addBtn.textContent = '🚀 ADD TO CAMPUS';
         });
     });
 
-    /* ── Load & render registered buildings ──────────────── */
+    /* ── Load & render registered buildings ─────────────── */
     function loadBuildings() {
       Promise.all([
         fetch('/api/graph').then(function (r) { return r.json(); }),
@@ -201,8 +245,6 @@
       ]).then(function (res) {
         var nodes = res[0].nodes;
         var pois = res[1];
-
-        // Pair each POI with its node; include standalone nodes of building type
         var nodeById = {};
         nodes.forEach(function (n) { nodeById[n.id] = n; });
 
@@ -219,19 +261,20 @@
       var list = $('building-list');
 
       if (buildings.length === 0) {
-        list.innerHTML = '<p class="empty-note">No buildings yet.</p>';
+        list.innerHTML = '<p class="empty-note">No buildings yet &mdash; go drop your first pin!</p>';
         return;
       }
 
       list.innerHTML = buildings.map(function (b) {
         var n = b.node;
         return '<div class="building-card" data-node-id="' + escapeHtml(n.id) + '">' +
+          '<span class="bc-emoji">🏷️</span>' +
           '<div class="bc-main">' +
             '<span class="bc-name">' + escapeHtml(b.poi.name) + '</span>' +
             '<span class="bc-meta">' + escapeHtml(n.type.replace('_', ' ')) + ' · ' +
               n.lat.toFixed(5) + ', ' + n.lng.toFixed(5) + '</span>' +
           '</div>' +
-          '<button class="inline-btn danger bc-del" data-node-id="' + escapeHtml(n.id) + '">DELETE</button>' +
+          '<button class="inline-btn danger bc-del" data-node-id="' + escapeHtml(n.id) + '">REMOVE</button>' +
         '</div>';
       }).join('');
 
@@ -239,14 +282,12 @@
         btn.addEventListener('click', function () {
           var nodeId = this.dataset.nodeId;
           var b = buildings.find(function (x) { return x.node.id === nodeId; });
-          if (!confirm('Delete "' + (b ? b.poi.name : nodeId) + '"? This removes the map point and its search entry.')) return;
-          // Deleting the node cascades to its POIs
-          fetch('/api/nodes/' + encodeURIComponent(nodeId), {
-            method: 'DELETE', headers: authHeaders()
-          }).then(function (r) {
-            if (!r.ok) throw new Error('Delete failed');
-            loadBuildings();
-          }).catch(function (err) { alert('Error: ' + err.message); });
+          if (!confirm('Remove "' + (b ? b.poi.name : nodeId) + '" from the map?')) return;
+          fetch('/api/nodes/' + encodeURIComponent(nodeId), { method: 'DELETE' })
+            .then(function (r) {
+              if (!r.ok) throw new Error('Delete failed');
+              loadBuildings();
+            }).catch(function (err) { alert('Error: ' + err.message); });
         });
       });
     }
