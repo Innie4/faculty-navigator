@@ -1556,6 +1556,20 @@ body.survey { padding: 0; }
   background: var(--color-accent-subtle);
 }
 
+/* — Brand logo image — */
+.brand-logo {
+  height: 30px;
+  width: auto;
+  display: block;
+  border: var(--border-medium);
+  background: var(--color-surface);
+}
+
+.site-header .brand-logo   { height: 34px; transform: rotate(-1deg); }
+.nav-header .brand-logo    { height: 28px; }
+.survey-header .brand-logo,
+.admin-header .brand-logo  { height: 26px; }
+
 /* ============================================================
     8.  RESPONSIVE
     ============================================================ */
