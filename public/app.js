@@ -1,5 +1,5 @@
 /**
- * app.js — Main frontend controller for Faculty Navigator.
+ * app.js — Main frontend controller for FindMyBlock.
  *
  * Fetches graph + POI data, initialises the Leaflet map, tracks GPS
  * position with three-state indicator, and draws A*-computed routes.

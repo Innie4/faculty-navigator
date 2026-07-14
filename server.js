@@ -73,7 +73,7 @@ async function startup() {
   } else {
     console.log(`  🔓  Write API is OPEN (set API_KEY env var to lock)`);
   }
-  console.log(`Faculty Navigator running at http://localhost:${PORT}`);
+    console.log(`FindMyBlock running at http://localhost:${PORT}`);
 }
 
 // ─── Existing endpoints (unchanged) ────────────────────────────

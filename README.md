@@ -1,4 +1,4 @@
-# Faculty Navigator
+# FindMyBlock
 
 A GPS-driven campus navigation system for university students. Built with **vanilla JavaScript**, **Node.js / Express**, **SQLite**, and **Leaflet.js** — zero build tools, zero frameworks, zero external services.
 
