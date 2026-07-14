@@ -264,6 +264,73 @@ function aStar(graph, startNodeId, endNodeId) {
 }
 
 /**
+ * dijkstra(graph, startNodeId, endNodeId) → { path, distance } | null
+ *
+ * Classic Dijkstra's shortest-path algorithm.  Identical to A* above
+ * except the priority score is always g(n) — it does NOT use a
+ * heuristic.  Dijkstra explores nodes in order of actual distance from
+ * the start, which guarantees optimality just like A*, but typically
+ * explores more nodes because it has no "direction sense" toward the goal.
+ *
+ * Use Dijkstra when you want a provably optimal path *without* relying
+ * on a geometric heuristic (e.g. if edge weights represent something
+ * other than geographic distance, like time or difficulty).
+ *
+ * @param {Object} graph       — { nodes: [...], edges: [...] }
+ * @param {string} startNodeId — origin node id
+ * @param {string} endNodeId   — destination node id
+ * @returns {Object|null}  { path, distance } or null if unreachable
+ */
+function dijkstra(graph, startNodeId, endNodeId) {
+  const adjacency = new Map();
+  for (const node of graph.nodes) adjacency.set(node.id, []);
+  for (const edge of graph.edges) {
+    adjacency.get(edge.from_node_id).push({ neighborId: edge.to_node_id, weight: edge.weight });
+    adjacency.get(edge.to_node_id).push({ neighborId: edge.from_node_id, weight: edge.weight });
+  }
+
+  const nodeMap = new Map();
+  for (const node of graph.nodes) nodeMap.set(node.id, node);
+
+  if (!nodeMap.has(startNodeId) || !nodeMap.has(endNodeId)) return null;
+
+  const gScores = new Map();
+  const cameFrom = new Map();
+  gScores.set(startNodeId, 0);
+
+  const openSet = new MinHeap();
+  openSet.insert(startNodeId, 0); // f(n) = g(n) — no heuristic
+
+  while (openSet.size > 0) {
+    const current = openSet.extractMin();
+    const currentNodeId = current.nodeId;
+
+    // Skip stale entries
+    if (current.score !== gScores.get(currentNodeId)) continue;
+
+    if (currentNodeId === endNodeId) {
+      const path = [];
+      let id = endNodeId;
+      while (id !== startNodeId) { path.unshift(nodeMap.get(id)); id = cameFrom.get(id); }
+      path.unshift(nodeMap.get(startNodeId));
+      return { path, distance: Math.round(gScores.get(endNodeId)) };
+    }
+
+    const currentG = gScores.get(currentNodeId);
+    for (const { neighborId, weight } of adjacency.get(currentNodeId) || []) {
+      const tentativeG = currentG + weight;
+      if (!gScores.has(neighborId) || tentativeG < gScores.get(neighborId)) {
+        gScores.set(neighborId, tentativeG);
+        cameFrom.set(neighborId, currentNodeId);
+        openSet.insert(neighborId, tentativeG); // f = g
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * generateDirections(path) → Array<{type, text, node, distance?, turnText?}>
  *
  * Takes the ordered array of graph nodes returned by A* and produces
@@ -356,5 +423,5 @@ function generateDirections(path) {
 
 // Expose for Node.js (tests); in the browser these are globals.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { haversineDistance, MinHeap, findNearestNode, aStar, generateDirections };
+  module.exports = { haversineDistance, MinHeap, findNearestNode, aStar, dijkstra, generateDirections };
 }

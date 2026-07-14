@@ -25,6 +25,7 @@
   <div id="app">
     <header class="nav-header">
       <div class="nav-header-left">
+        <a href="/" class="back-btn" title="Back to home">&#8592; BACK</a>
         <a href="/" class="nav-logo">FN</a>
         <div class="gps-indicator" id="gps-indicator">
           <span class="gps-dot state-locating" id="gps-dot"></span>
@@ -42,6 +43,11 @@
         autocomplete="off"
       />
       <ul id="results-list"></ul>
+      <div class="algo-toggle" id="algo-toggle">
+        <span class="algo-label">ROUTE BY</span>
+        <button type="button" class="algo-btn active" data-algo="a-star">A&#42;</button>
+        <button type="button" class="algo-btn" data-algo="dijkstra">DIJKSTRA</button>
+      </div>
     </div>
 
     <div id="map"></div>

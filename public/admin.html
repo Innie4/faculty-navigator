@@ -2,136 +2,97 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Faculty Navigator — Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Faculty Navigator — Admin: Buildings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="admin">
   <div class="admin-page">
     <header class="admin-header">
-      <h1>ADMIN</h1>
-      <a href="/">back to home</a>
+      <h1>BUILDING REGISTRY</h1>
+      <a href="/" class="back-btn">&#8592; BACK</a>
     </header>
 
-    <!-- ── API key bar ─────────────────────────────────── -->
+    <p class="admin-intro">
+      Register a building by name and coordinates. Each entry is saved
+      <strong>twice</strong> &mdash; as a map point the navigator can route to,
+      and as a searchable place people can look up. The navigator just reads
+      these from the database.
+    </p>
+
+    <!-- ── API key bar ───────────────────────────────────── -->
     <div class="apikey-bar">
-      <label for="api-key-input">API KEY</label>
-      <input type="text" id="api-key-input" placeholder="Leave empty if unset on server" autocomplete="off" />
-      <span id="api-key-status" class="apikey-status apikey-unknown">?</span>
+      <label for="api-key">API KEY</label>
+      <input type="text" id="api-key" placeholder="Leave empty if unset" autocomplete="off" />
+      <span id="api-status" class="apikey-status apikey-unknown">?</span>
     </div>
 
-    <!-- ── Stats ────────────────────────────────────────── -->
-    <div class="stats-row" id="stats-row">
-      <div class="stat-card"><span class="stat-number" id="stat-nodes">--</span><span class="stat-label">Nodes</span></div>
-      <div class="stat-card"><span class="stat-number" id="stat-edges">--</span><span class="stat-label">Edges</span></div>
-      <div class="stat-card"><span class="stat-number" id="stat-pois">--</span><span class="stat-label">POIs</span></div>
-      <div class="stat-card" id="stat-isolated-card"><span class="stat-number" id="stat-isolated">--</span><span class="stat-label">Isolated</span></div>
-    </div>
+    <!-- ── Building entry form ───────────────────────────── -->
+    <form class="building-form" id="building-form">
+      <h2 class="form-head">ADD A BUILDING</h2>
 
-    <!-- ── Nodes table ──────────────────────────────────── -->
-    <div class="admin-section">
-      <h2>NODES</h2>
-      <table class="admin-table" id="nodes-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Lat</th>
-            <th>Lng</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="nodes-body"></tbody>
-      </table>
-    </div>
+      <label for="b-name">Building name</label>
+      <input type="text" id="b-name" placeholder="e.g. Faculty of Engineering" autocomplete="off" />
 
-    <!-- ── Edges table ──────────────────────────────────── -->
-    <div class="admin-section">
-      <h2>EDGES</h2>
-      <table class="admin-table" id="edges-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Weight (m)</th>
-            <th>Surface</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="edges-body"></tbody>
-      </table>
-    </div>
-
-    <!-- ── POIs table ───────────────────────────────────── -->
-    <div class="admin-section">
-      <h2>POINTS OF INTEREST</h2>
-      <table class="admin-table" id="pois-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Node</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="pois-body"></tbody>
-      </table>
-    </div>
-
-    <!-- ── Add POI form ─────────────────────────────────── -->
-    <div class="admin-section">
-      <h2>LINK POI</h2>
-      <form class="admin-poi-form" id="poi-form">
+      <div class="coord-grid">
         <div>
-          <label for="poi-node">Node</label>
-          <select id="poi-node"></select>
+          <label for="b-lat">Latitude</label>
+          <input type="number" id="b-lat" step="any" placeholder="5.0315" />
         </div>
         <div>
-          <label for="poi-name">POI name</label>
-          <input type="text" id="poi-name" placeholder="e.g. Department of Computer Science" />
+          <label for="b-lng">Longitude</label>
+          <input type="number" id="b-lng" step="any" placeholder="7.9208" />
         </div>
-        <button type="submit" class="inline-btn">ADD POI</button>
-      </form>
-    </div>
-
-    <!-- ── Connectivity check ───────────────────────────── -->
-    <div class="admin-section">
-      <h2>CONNECTIVITY</h2>
-      <div class="connectivity-list" id="connectivity-list">
-        <p>Loading…</p>
       </div>
-    </div>
 
-    <!-- ── Export ────────────────────────────────────────── -->
+      <button type="button" class="locate-fill" id="locate-fill">⌖ USE MY LOCATION</button>
+
+      <label for="b-category">Category</label>
+      <select id="b-category">
+        <option value="building_entrance">Building</option>
+        <option value="facility">Facility</option>
+        <option value="landmark">Landmark</option>
+        <option value="gate">Gate</option>
+      </select>
+
+      <button type="submit" class="capture-btn" id="add-btn">SAVE BUILDING</button>
+      <div id="form-msg" class="form-msg"></div>
+    </form>
+
+    <!-- ── Registered buildings list ─────────────────────── -->
     <div class="admin-section">
-      <h2>EXPORT</h2>
-      <div style="padding:var(--space-sm);">
-        <a href="/api/export" target="_blank"
-          style="font-family:var(--font-display);font-size:0.85rem;letter-spacing:0.06em;
-                 text-transform:uppercase;border:var(--border-thick);padding:var(--space-xs) var(--space-sm);
-                 background:var(--color-text);color:var(--color-surface);display:inline-block;">
-          DOWNLOAD JSON BACKUP
-        </a>
+      <h2>REGISTERED BUILDINGS (<span id="b-count">0</span>)</h2>
+      <div id="building-list" class="building-list">
+        <p class="empty-note">No buildings yet.</p>
       </div>
     </div>
   </div>
 
   <script>
     /* ============================================================
-       admin.js — Lightweight database review and editing
+       admin.js — Building registry admin page
+       Saves each building as BOTH a graph node (routable) and a
+       POI (searchable). The navigator reads both from the database.
        ============================================================ */
 
     var $ = function (id) { return document.getElementById(id); };
 
     var apiKey = '';
-    var nodes = [];
-    var edges = [];
-    var pois = [];
+    var buildings = [];   // { node, poi }
+
+    /* ── API key ─────────────────────────────────────────── */
+    $('api-key').addEventListener('input', function () {
+      apiKey = this.value.trim();
+      var s = $('api-status');
+      s.textContent = apiKey ? 'KEY SET' : 'OPEN';
+      s.className = 'apikey-status ' + (apiKey ? 'apikey-set' : 'apikey-open');
+    });
 
     function authHeaders() {
       var h = { 'Content-Type': 'application/json' };
@@ -139,305 +100,157 @@
       return h;
     }
 
-    function updateApiKeyStatus() {
-      var el = $('api-key-status');
-      el.textContent = apiKey ? 'KEY SET' : 'OPEN';
-      el.className = 'apikey-status ' + (apiKey ? 'apikey-set' : 'apikey-open');
+    /* ── Build a URL-friendly id from a name ─────────────── */
+    function makeId(name) {
+      return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'bld_' + Date.now();
     }
 
-    $('api-key-input').addEventListener('input', function () {
-      apiKey = this.value.trim();
-      updateApiKeyStatus();
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* ── GPS auto-fill ───────────────────────────────────── */
+    $('locate-fill').addEventListener('click', function () {
+      if (!navigator.geolocation) { alert('Geolocation not available.'); return; }
+      this.textContent = '⌖ LOCATING…';
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          $('b-lat').value = pos.coords.latitude.toFixed(6);
+          $('b-lng').value = pos.coords.longitude.toFixed(6);
+          $('locate-fill').textContent = '⌖ USE MY LOCATION';
+        },
+        function (err) {
+          alert('Could not get location: ' + err.message);
+          $('locate-fill').textContent = '⌖ USE MY LOCATION';
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
     });
 
-    // ── Fetch all data ──────────────────────────────────
-    function loadData() {
-      return Promise.all([
-        fetch('/api/graph').then(function (r) { return r.json(); }),
-        fetch('/api/pois').then(function (r) { return r.json(); })
-      ]).then(function (results) {
-        var graph = results[0];
-        nodes = graph.nodes;
-        edges = graph.edges;
-        pois = results[1];
-        render();
-      }).catch(function (err) {
-        alert('Failed to load data: ' + err.message);
-      });
-    }
-
-    // ── Render everything ────────────────────────────────
-    function render() {
-      renderStats();
-      renderNodes();
-      renderEdges();
-      renderPois();
-      renderPoiDropdown();
-      renderConnectivity();
-    }
-
-    // ── Stats ────────────────────────────────────────────
-    function renderStats() {
-      $('stat-nodes').textContent = nodes.length;
-      $('stat-edges').textContent = edges.length;
-      $('stat-pois').textContent = pois.length;
-
-      // Count isolated nodes (degree 0)
-      var edgeNodeIds = new Set();
-      edges.forEach(function (e) {
-        edgeNodeIds.add(e.from_node_id);
-        edgeNodeIds.add(e.to_node_id);
-      });
-      var isolated = nodes.filter(function (n) { return !edgeNodeIds.has(n.id); });
-      $('stat-isolated').textContent = isolated.length;
-      var card = $('stat-isolated-card');
-      if (isolated.length > 0) {
-        card.className = 'stat-card warn';
-      } else {
-        card.className = 'stat-card';
-      }
-    }
-
-    // ── Nodes table ──────────────────────────────────────
-    function renderNodes() {
-      var html = '';
-      for (var i = 0; i < nodes.length; i++) {
-        var n = nodes[i];
-        html += '<tr>';
-        html += '<td><code>' + escapeHtml(n.id) + '</code></td>';
-        html += '<td><input class="node-name" data-id="' + escapeHtml(n.id) +
-          '" value="' + escapeHtml(n.name) + '" /></td>';
-        html += '<td><select class="node-type" data-id="' + escapeHtml(n.id) + '">' +
-          typeOptions(n.type) + '</select></td>';
-        html += '<td>' + n.lat.toFixed(5) + '</td>';
-        html += '<td>' + n.lng.toFixed(5) + '</td>';
-        html += '<td>' +
-          '<button class="inline-btn node-save" data-id="' + escapeHtml(n.id) + '">SAVE</button>' +
-          ' <button class="inline-btn danger node-delete" data-id="' + escapeHtml(n.id) + '">DEL</button>' +
-          '</td>';
-        html += '</tr>';
-      }
-      $('nodes-body').innerHTML = html;
-
-      // Wire up save buttons
-      $('nodes-body').querySelectorAll('.node-save').forEach(function (btn) {
-        btn.addEventListener('click', onNodeSave);
-      });
-      $('nodes-body').querySelectorAll('.node-delete').forEach(function (btn) {
-        btn.addEventListener('click', onNodeDelete);
-      });
-    }
-
-    function typeOptions(selected) {
-      var types = ['building_entrance', 'junction', 'gate', 'turning_point'];
-      return types.map(function (t) {
-        var sel = t === selected ? ' selected' : '';
-        return '<option' + sel + '>' + t + '</option>';
-      }).join('');
-    }
-
-    // ── Node save handler ────────────────────────────────
-    function onNodeSave(e) {
-      var id = e.target.dataset.id;
-      var row = e.target.closest('tr');
-      var name = row.querySelector('.node-name').value.trim();
-      var type = row.querySelector('.node-type').value;
-
-      fetch('/api/nodes/' + encodeURIComponent(id), {
-        method: 'PUT',
-        headers: authHeaders(),
-        body: JSON.stringify({ name: name, type: type })
-      })
-        .then(function (r) {
-          if (!r.ok) throw new Error('Save failed');
-          return r.json();
-        })
-        .then(function () {
-          loadData();
-        })
-        .catch(function (err) {
-          alert('Error: ' + err.message);
-        });
-    }
-
-    // ── Node delete handler ──────────────────────────────
-    function onNodeDelete(e) {
-      var id = e.target.dataset.id;
-      if (!confirm('Delete node "' + id + '" and all its edges and POIs?')) return;
-
-      fetch('/api/nodes/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() })
-        .then(function (r) {
-          if (!r.ok) throw new Error('Delete failed');
-          return r.json();
-        })
-        .then(function () {
-          loadData();
-        })
-        .catch(function (err) {
-          alert('Error: ' + err.message);
-        });
-    }
-
-    // ── Edges table ──────────────────────────────────────
-    function renderEdges() {
-      var html = '';
-      for (var i = 0; i < edges.length; i++) {
-        var e = edges[i];
-        var fromName = (nodes.find(function (n) { return n.id === e.from_node_id; }) || {}).name || e.from_node_id;
-        var toName = (nodes.find(function (n) { return n.id === e.to_node_id; }) || {}).name || e.to_node_id;
-        html += '<tr>';
-        html += '<td>' + e.id + '</td>';
-        html += '<td><code>' + escapeHtml(e.from_node_id) + '</code> <span style="color:var(--color-muted)">' +
-          escapeHtml(fromName) + '</span></td>';
-        html += '<td><code>' + escapeHtml(e.to_node_id) + '</code> <span style="color:var(--color-muted)">' +
-          escapeHtml(toName) + '</span></td>';
-        html += '<td>' + Math.round(e.weight) + '</td>';
-        html += '<td><select class="edge-surface" data-id="' + e.id + '">' +
-          '<option value="paved"' + (e.surface_type === 'paved' ? ' selected' : '') + '>Paved</option>' +
-          '<option value="earthen"' + (e.surface_type === 'earthen' ? ' selected' : '') + '>Earthen</option>' +
-          '</select></td>';
-        html += '<td><button class="inline-btn edge-save" data-id="' + e.id + '">SAVE</button></td>';
-        html += '</tr>';
-      }
-      $('edges-body').innerHTML = html;
-
-      $('edges-body').querySelectorAll('.edge-save').forEach(function (btn) {
-        btn.addEventListener('click', onEdgeSave);
-      });
-    }
-
-    // ── Edge save handler ────────────────────────────────
-    function onEdgeSave(e) {
-      var id = e.target.dataset.id;
-      var row = e.target.closest('tr');
-      var surface = row.querySelector('.edge-surface').value;
-
-      fetch('/api/edges/' + id, {
-        method: 'PUT',
-        headers: authHeaders(),
-        body: JSON.stringify({ surface_type: surface })
-      })
-        .then(function (r) {
-          if (!r.ok) throw new Error('Save failed');
-          return r.json();
-        })
-        .then(function () {
-          loadData();
-        })
-        .catch(function (err) {
-          alert('Error: ' + err.message);
-        });
-    }
-
-    // ── POIs table ───────────────────────────────────────
-    function renderPois() {
-      var html = '';
-      for (var i = 0; i < pois.length; i++) {
-        var p = pois[i];
-        var nodeName = (nodes.find(function (n) { return n.id === p.node_id; }) || {}).name || p.node_id;
-        html += '<tr>';
-        html += '<td>' + p.id + '</td>';
-        html += '<td>' + escapeHtml(p.name) + '</td>';
-        html += '<td><code>' + escapeHtml(p.node_id) + '</code> <span style="color:var(--color-muted)">' +
-          escapeHtml(nodeName) + '</span></td>';
-        html += '<td><button class="inline-btn danger poi-delete" data-id="' + p.id + '">DEL</button></td>';
-        html += '</tr>';
-      }
-      $('pois-body').innerHTML = html;
-
-      $('pois-body').querySelectorAll('.poi-delete').forEach(function (btn) {
-        btn.addEventListener('click', onPoiDelete);
-      });
-    }
-
-    function onPoiDelete(e) {
-      var id = e.target.dataset.id;
-      if (!confirm('Delete this POI?')) return;
-
-      fetch('/api/pois/' + id, { method: 'DELETE', headers: authHeaders() })
-        .then(function (r) {
-          if (!r.ok) throw new Error('Delete failed');
-          return r.json();
-        })
-        .then(function () {
-          loadData();
-        })
-        .catch(function (err) {
-          alert('Error: ' + err.message);
-        });
-    }
-
-    // ── POI dropdown + form ──────────────────────────────
-    function renderPoiDropdown() {
-      var sel = $('poi-node');
-      sel.innerHTML = nodes.map(function (n) {
-        return '<option value="' + escapeHtml(n.id) + '">' +
-          escapeHtml(n.name) + ' (' + escapeHtml(n.id) + ')' +
-          '</option>';
-      }).join('');
-    }
-
-    $('poi-form').addEventListener('submit', function (e) {
+    /* ── Add a building ──────────────────────────────────── */
+    $('building-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var nodeId = $('poi-node').value;
-      var name = $('poi-name').value.trim();
-      if (!name) { alert('Enter a POI name.'); return; }
 
-      fetch('/api/pois', {
+      var name = $('b-name').value.trim();
+      var lat = parseFloat($('b-lat').value);
+      var lng = parseFloat($('b-lng').value);
+      var category = $('b-category').value;
+
+      var msg = $('form-msg');
+      msg.className = 'form-msg';
+      msg.textContent = '';
+
+      if (!name) { msg.textContent = 'Enter a building name.'; msg.className = 'form-msg error'; return; }
+      if (isNaN(lat) || isNaN(lng)) { msg.textContent = 'Enter valid latitude and longitude.'; msg.className = 'form-msg error'; return; }
+
+      var id = makeId(name);
+      var suffix = 1, orig = id;
+      while (buildings.some(function (b) { return b.node.id === id; })) id = orig + '_' + suffix++;
+
+      // Map the user-facing category onto a valid node type
+      var nodeType = category === 'gate' ? 'gate' : 'building_entrance';
+
+      var addBtn = $('add-btn');
+      addBtn.disabled = true;
+      addBtn.textContent = 'SAVING…';
+
+      // 1) Save as a graph node (routable)
+      fetch('/api/nodes', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ name: name, node_id: nodeId })
+        body: JSON.stringify({ id: id, name: name, lat: lat, lng: lng, type: nodeType })
       })
         .then(function (r) {
-          if (!r.ok) return r.json().then(function (err) { throw new Error(err.error); });
+          if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'Node save failed'); });
           return r.json();
         })
         .then(function () {
-          $('poi-name').value = '';
-          loadData();
+          // 2) Save as a POI (searchable) linked to the node
+          return fetch('/api/pois', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ name: name, node_id: id })
+          }).then(function (r) {
+            if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'POI save failed'); });
+            return r.json();
+          });
+        })
+        .then(function () {
+          msg.textContent = 'Saved "' + name + '" as node + POI.';
+          msg.className = 'form-msg ok';
+          $('building-form').reset();
+          loadBuildings();
         })
         .catch(function (err) {
-          alert('Error: ' + err.message);
+          msg.textContent = 'Error: ' + err.message;
+          msg.className = 'form-msg error';
+        })
+        .then(function () {
+          addBtn.disabled = false;
+          addBtn.textContent = 'SAVE BUILDING';
         });
     });
 
-    // ── Connectivity check ───────────────────────────────
-    function renderConnectivity() {
-      var edgeNodeIds = new Set();
-      edges.forEach(function (e) {
-        edgeNodeIds.add(e.from_node_id);
-        edgeNodeIds.add(e.to_node_id);
-      });
+    /* ── Load & render registered buildings ──────────────── */
+    function loadBuildings() {
+      Promise.all([
+        fetch('/api/graph').then(function (r) { return r.json(); }),
+        fetch('/api/pois').then(function (r) { return r.json(); })
+      ]).then(function (res) {
+        var nodes = res[0].nodes;
+        var pois = res[1];
 
-      var isolated = nodes.filter(function (n) { return !edgeNodeIds.has(n.id); });
+        // Pair each POI with its node; include standalone nodes of building type
+        var nodeById = {};
+        nodes.forEach(function (n) { nodeById[n.id] = n; });
 
-      var html = '';
-      if (isolated.length === 0) {
-        html += '<p class="ok">All ' + nodes.length + ' nodes are connected to at least one edge.</p>';
-      } else {
-        html += '<p class="bad">' + isolated.length + ' node(s) have no edges — routing to/from them will fail:</p>';
-        html += '<ul>';
-        for (var i = 0; i < isolated.length; i++) {
-          html += '<li class="bad">' + escapeHtml(isolated[i].name) + ' (' + escapeHtml(isolated[i].id) + ')</li>';
-        }
-        html += '</ul>';
+        buildings = pois.map(function (p) {
+          return { poi: p, node: nodeById[p.node_id] || null };
+        }).filter(function (b) { return b.node; });
+
+        renderBuildings();
+      }).catch(function () { /* silent */ });
+    }
+
+    function renderBuildings() {
+      $('b-count').textContent = buildings.length;
+      var list = $('building-list');
+
+      if (buildings.length === 0) {
+        list.innerHTML = '<p class="empty-note">No buildings yet.</p>';
+        return;
       }
 
-      // Check for disconnected components by counting edges per node
-      html += '<p style="margin-top:var(--space-sm);font-size:0.78rem;color:var(--color-muted);">' +
-        'Total edges: ' + edges.length + ' &middot; Total distinct connected nodes: ' +
-        edgeNodeIds.size + ' of ' + nodes.length + '</p>';
+      list.innerHTML = buildings.map(function (b) {
+        var n = b.node;
+        return '<div class="building-card" data-node-id="' + escapeHtml(n.id) + '">' +
+          '<div class="bc-main">' +
+            '<span class="bc-name">' + escapeHtml(b.poi.name) + '</span>' +
+            '<span class="bc-meta">' + escapeHtml(n.type.replace('_', ' ')) + ' · ' +
+              n.lat.toFixed(5) + ', ' + n.lng.toFixed(5) + '</span>' +
+          '</div>' +
+          '<button class="inline-btn danger bc-del" data-node-id="' + escapeHtml(n.id) + '">DELETE</button>' +
+        '</div>';
+      }).join('');
 
-      $('connectivity-list').innerHTML = html;
+      list.querySelectorAll('.bc-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var nodeId = this.dataset.nodeId;
+          var b = buildings.find(function (x) { return x.node.id === nodeId; });
+          if (!confirm('Delete "' + (b ? b.poi.name : nodeId) + '"? This removes the map point and its search entry.')) return;
+          // Deleting the node cascades to its POIs
+          fetch('/api/nodes/' + encodeURIComponent(nodeId), {
+            method: 'DELETE', headers: authHeaders()
+          }).then(function (r) {
+            if (!r.ok) throw new Error('Delete failed');
+            loadBuildings();
+          }).catch(function (err) { alert('Error: ' + err.message); });
+        });
+      });
     }
 
-    // ── Util ──────────────────────────────────────────────
-    function escapeHtml(s) {
-      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    // ── Boot ──────────────────────────────────────────────
-    loadData();
+    loadBuildings();
   </script>
 </body>
 </html>

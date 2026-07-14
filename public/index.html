@@ -24,10 +24,23 @@
     <span class="site-tagline">UNIVERSITY OF UYO</span>
   </header>
 
+  <!-- ── Gamified marquee ticker ─────────────────────────── -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <span>★ GET LOST LESS</span><span>◆ KNOW WHERE YOU'RE GOING</span>
+      <span>★ EARN BADGES</span><span>◆ MAP THE CAMPUS</span>
+      <span>★ PICK YOUR ALGORITHM</span><span>◆ WALK THE LINE</span>
+      <span>★ GET LOST LESS</span><span>◆ KNOW WHERE YOU'RE GOING</span>
+      <span>★ EARN BADGES</span><span>◆ MAP THE CAMPUS</span>
+      <span>★ PICK YOUR ALGORITHM</span><span>◆ WALK THE LINE</span>
+    </div>
+  </div>
+
   <main>
     <!-- ── Hero ────────────────────────────────────────────── -->
     <section class="hero">
       <div class="hero-text">
+        <span class="hero-badge">NEW · CAMPUS QUEST v1</span>
         <h1 class="hero-headline">
           DON'T ASK A&nbsp;STRANGER.<br />FOLLOW THE&nbsp;LINE.
           <svg
@@ -45,15 +58,22 @@
           </svg>
         </h1>
         <p class="hero-sub">
-          Faculty Navigator is a GPS-powered campus map that shows you how to
-          get where you&rsquo;re going. No wandering. No asking around. Just
-          open it, pick your destination, and walk the route.
+          Faculty Navigator is a GPS-powered campus map that turns walking to
+          class into a game. Pick a destination, follow the red line, and unlock
+          the campus one building at a time. No wandering. No asking around.
         </p>
-        <a href="/navigate.html" class="cta-button">OPEN THE MAP</a>
+        <div class="hero-cta-row">
+          <a href="/navigate.html" class="cta-button">OPEN THE MAP</a>
+          <a href="/admin.html" class="cta-button cta-secondary">+ ADD A BUILDING</a>
+        </div>
       </div>
 
       <div class="hero-visual">
         <div id="mini-map"></div>
+        <div class="hero-level">
+          <span class="level-pin">📍</span>
+          <span class="level-text">YOUR RANK:<br /><strong>FRESHMAN EXPLORER</strong></span>
+        </div>
       </div>
     </section>
 
@@ -83,6 +103,73 @@
           <p class="step-desc">
             A red line appears on the map. Follow it straight to your
             destination.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Gamified mission / progress ─────────────────────── -->
+    <section class="mission">
+      <div class="mission-head">
+        <h2 class="section-headline">YOUR CAMPUS MISSION</h2>
+        <p class="mission-sub">
+          Every building added and every route walked makes the map smarter.
+          Here&rsquo;s where we stand.
+        </p>
+      </div>
+
+      <div class="progress-card">
+        <div class="progress-top">
+          <span class="progress-label">CAMPUS MAPPED</span>
+          <span class="progress-pct">12%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:12%"></div></div>
+        <p class="progress-note">Help us reach 100% &mdash; add buildings in the <a href="/admin.html">registry</a>.</p>
+      </div>
+
+      <div class="badges">
+        <div class="badge earned">
+          <span class="badge-icon">🚀</span>
+          <span class="badge-name">First Steps</span>
+          <span class="badge-desc">Opened the map</span>
+        </div>
+        <div class="badge locked">
+          <span class="badge-icon">🏛️</span>
+          <span class="badge-name">Cartographer</span>
+          <span class="badge-desc">Add 10 buildings</span>
+        </div>
+        <div class="badge locked">
+          <span class="badge-icon">🌙</span>
+          <span class="badge-name">Night Owl</span>
+          <span class="badge-desc">Route after dark</span>
+        </div>
+        <div class="badge locked">
+          <span class="badge-icon">🧭</span>
+          <span class="badge-name">Pathfinder</span>
+          <span class="badge-desc">Walk 25 routes</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Choose your algorithm (gamified) ────────────────── -->
+    <section class="weapon">
+      <h2 class="section-headline">CHOOSE YOUR WEAPON</h2>
+      <p class="weapon-sub">Two ways to find the shortest path. Pick one in the app.</p>
+      <div class="weapon-grid">
+        <div class="weapon-card" style="--step-rotation: -0.8deg">
+          <span class="weapon-tag">FAST &amp; FOCUSED</span>
+          <h3 class="weapon-name">A&#42; SEARCH</h3>
+          <p class="weapon-desc">
+            Uses a straight-line hint to zoom toward the goal. Usually the
+            quickest to compute. Your default arrow.
+          </p>
+        </div>
+        <div class="weapon-card" style="--step-rotation: 0.8deg">
+          <span class="weapon-tag">THOROUGH &amp; HONEST</span>
+          <h3 class="weapon-name">DIJKSTRA</h3>
+          <p class="weapon-desc">
+            Explores calmly in every direction until it finds the best route.
+            No shortcuts, no hints &mdash; pure shortest path.
           </p>
         </div>
       </div>

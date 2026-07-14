@@ -10,6 +10,7 @@ let map, graph, pois, currentPosMarker, routePolyline, destMarker;
 let currentPos = null;
 let activeDestNodeId = null;
 let directionsSteps = null;
+let currentAlgorithm = 'a-star';
 
 /* ─── Config ───────────────────────────────────────────────── */
 const DEFAULT_CENTER = [5.0315, 7.9208];
@@ -81,6 +82,16 @@ async function init() {
     if (!e.target.closest('.search-container')) {
       $('results-list').innerHTML = '';
     }
+  });
+
+  /* Algorithm picker (A* vs Dijkstra) */
+  const algoBtns = document.querySelectorAll('#algo-toggle .algo-btn');
+  algoBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentAlgorithm = btn.dataset.algo;
+      algoBtns.forEach((b) => b.classList.toggle('active', b === btn));
+      if (activeDestNodeId) recalculateRoute();
+    });
   });
 
   /* Directions toggle & close */
@@ -175,15 +186,26 @@ function onGpsError(err) {
   setGpsState('error');
 }
 
+/* ─── Fetch a route from the backend (/api/route/:algorithm) ── */
+async function fetchRoute(fromId, toId) {
+  const res = await fetch(
+    '/api/route/' + currentAlgorithm +
+    '?from=' + encodeURIComponent(fromId) +
+    '&to=' + encodeURIComponent(toId)
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
 /* ─── Recalculate route from current position ──────────────── */
-function recalculateRoute() {
+async function recalculateRoute() {
   const nearest = findNearestNode(currentPos.lat, currentPos.lng, graph.nodes);
   if (!nearest) return;
 
-  const result = aStar(graph, nearest.id, activeDestNodeId);
-  if (result) {
-    drawRoute(result);
-    distanceEl.textContent = Math.round(result.distance) + ' m';
+  const data = await fetchRoute(nearest.id, activeDestNodeId);
+  if (data) {
+    drawRoute(data);
+    distanceEl.textContent = Math.round(data.distance) + ' m';
   } else {
     statusEl.textContent = 'No route from your position.';
   }
@@ -217,7 +239,7 @@ async function onSearch(e) {
 }
 
 /* ─── User selects a destination ───────────────────────────── */
-function selectDestination(nodeId, name) {
+async function selectDestination(nodeId, name) {
   const searchBox = $('search-box');
   searchBox.value = name;
   $('results-list').innerHTML = '';
@@ -245,11 +267,11 @@ function selectDestination(nodeId, name) {
       return;
     }
 
-    const result = aStar(graph, nearest.id, nodeId);
+    const result = await fetchRoute(nearest.id, nodeId);
     if (result) {
       drawRoute(result);
       distanceEl.textContent = Math.round(result.distance) + ' m';
-      statusEl.textContent = 'Route to ' + name;
+      statusEl.textContent = 'Route to ' + name + ' (' + currentAlgorithm + ')';
     } else {
       statusEl.textContent = 'No route found — disconnected?';
       distanceEl.textContent = '';

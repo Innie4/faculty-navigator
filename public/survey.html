@@ -13,7 +13,7 @@
   <div class="survey-page">
     <header class="survey-header">
       <h1>SURVEY</h1>
-      <a href="/" class="survey-link">back to home</a>
+      <a href="/" class="back-btn">&#8592; BACK</a>
     </header>
 
     <!-- ── Live GPS readout ────────────────────────────── -->
@@ -74,6 +74,89 @@
       <label for="survey-api-key" style="font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.08em;">API KEY</label>
       <input type="text" id="survey-api-key" placeholder="Leave empty if unset" autocomplete="off" style="flex:1;padding:4px 8px;font-family:var(--font-body);font-size:0.8rem;border:2px solid var(--color-border);background:var(--color-bg);" />
       <span id="survey-api-status" style="font-size:0.65rem;font-weight:700;">?</span>
+    </div>
+
+    <!-- ── Admin Panel Toggle ──────────────────────────────── -->
+    <div style="margin-top:var(--space-md);text-align:center;">
+      <button id="admin-toggle-btn" class="capture-btn" style="width:auto;padding:var(--space-xs) var(--space-md);font-size:0.85rem;">SHOW ADMIN PANEL</button>
+    </div>
+
+    <div id="survey-admin-panel" style="display:none;">
+      <!-- ── Stats ─────────────────────────────────────── -->
+      <div class="stats-row" id="survey-stats" style="margin-top:var(--space-md);">
+        <div class="stat-card"><span class="stat-number" id="s-stat-nodes">--</span><span class="stat-label">Nodes</span></div>
+        <div class="stat-card"><span class="stat-number" id="s-stat-edges">--</span><span class="stat-label">Edges</span></div>
+        <div class="stat-card"><span class="stat-number" id="s-stat-pois">--</span><span class="stat-label">POIs</span></div>
+        <div class="stat-card" id="s-stat-iso-card"><span class="stat-number" id="s-stat-iso">--</span><span class="stat-label">Isolated</span></div>
+      </div>
+
+      <!-- ── Nodes table ────────────────────────────────── -->
+      <div class="admin-section">
+        <h2>NODES</h2>
+        <div style="overflow-x:auto;">
+          <table class="admin-table" id="s-nodes-table">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Type</th><th>Lat</th><th>Lng</th><th></th></tr>
+            </thead>
+            <tbody id="s-nodes-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Edges table ────────────────────────────────── -->
+      <div class="admin-section">
+        <h2>EDGES</h2>
+        <div style="overflow-x:auto;">
+          <table class="admin-table" id="s-edges-table">
+            <thead>
+              <tr><th>ID</th><th>From</th><th>To</th><th>Weight</th><th>Surface</th><th></th></tr>
+            </thead>
+            <tbody id="s-edges-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── POIs table + form ──────────────────────────── -->
+      <div class="admin-section">
+        <h2>POINTS OF INTEREST</h2>
+        <div style="overflow-x:auto;">
+          <table class="admin-table" id="s-pois-table">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Node</th><th></th></tr>
+            </thead>
+            <tbody id="s-pois-body"></tbody>
+          </table>
+        </div>
+        <form class="admin-poi-form" id="s-poi-form" style="border-top:var(--border-medium);">
+          <div>
+            <label for="s-poi-node">Node</label>
+            <select id="s-poi-node"></select>
+          </div>
+          <div>
+            <label for="s-poi-name">POI name</label>
+            <input type="text" id="s-poi-name" placeholder="e.g. Department of Computer Science" />
+          </div>
+          <button type="submit" class="inline-btn">ADD POI</button>
+        </form>
+      </div>
+
+      <!-- ── Connectivity + Export ──────────────────────── -->
+      <div class="admin-section">
+        <h2>CONNECTIVITY</h2>
+        <div class="connectivity-list" id="s-conn-list"><p>Loading…</p></div>
+      </div>
+
+      <div class="admin-section">
+        <h2>EXPORT</h2>
+        <div style="padding:var(--space-sm);">
+          <a href="/api/export" target="_blank"
+             style="font-family:var(--font-display);font-size:0.85rem;letter-spacing:0.06em;
+                    text-transform:uppercase;border:var(--border-thick);padding:var(--space-xs) var(--space-sm);
+                    background:var(--color-text);color:var(--color-surface);display:inline-block;">
+            DOWNLOAD JSON BACKUP
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -338,6 +421,205 @@
     }
 
     startGps();
+
+    // ══════════════════════════════════════════════════════════════
+    //  ADMIN PANEL (inline data review & editing)
+    // ══════════════════════════════════════════════════════════════
+
+    var adminNodes = [];
+    var adminEdges = [];
+    var adminPois = [];
+
+    function loadAdminData() {
+      return Promise.all([
+        fetch('/api/graph').then(function (r) { return r.json(); }),
+        fetch('/api/pois').then(function (r) { return r.json(); })
+      ]).then(function (results) {
+        adminNodes = results[0].nodes;
+        adminEdges = results[0].edges;
+        adminPois = results[1];
+        renderAdmin();
+      }).catch(function () { /* silent */ });
+    }
+
+    function renderAdmin() {
+      renderAdminStats();
+      renderAdminNodes();
+      renderAdminEdges();
+      renderAdminPois();
+      renderAdminPoiDropdown();
+      renderAdminConnectivity();
+    }
+
+    function renderAdminStats() {
+      $('s-stat-nodes').textContent = adminNodes.length;
+      $('s-stat-edges').textContent = adminEdges.length;
+      $('s-stat-pois').textContent = adminPois.length;
+      var edgeNodeIds = new Set();
+      adminEdges.forEach(function (e) { edgeNodeIds.add(e.from_node_id); edgeNodeIds.add(e.to_node_id); });
+      var isolated = adminNodes.filter(function (n) { return !edgeNodeIds.has(n.id); });
+      $('s-stat-iso').textContent = isolated.length;
+      $('s-stat-iso-card').className = 'stat-card' + (isolated.length > 0 ? ' warn' : '');
+    }
+
+    function typeOptions(selected) {
+      var types = ['building_entrance','junction','gate','turning_point'];
+      return types.map(function (t) { var sel = t === selected ? ' selected' : ''; return '<option' + sel + '>' + t + '</option>'; }).join('');
+    }
+
+    function renderAdminNodes() {
+      var html = '';
+      for (var i = 0; i < adminNodes.length; i++) {
+        var n = adminNodes[i];
+        html += '<tr>';
+        html += '<td><code>' + escapeHtml(n.id) + '</code></td>';
+        html += '<td><input class="sn-name" data-id="' + escapeHtml(n.id) + '" value="' + escapeHtml(n.name) + '" /></td>';
+        html += '<td><select class="sn-type" data-id="' + escapeHtml(n.id) + '">' + typeOptions(n.type) + '</select></td>';
+        html += '<td>' + n.lat.toFixed(5) + '</td><td>' + n.lng.toFixed(5) + '</td>';
+        html += '<td><button class="inline-btn sn-save" data-id="' + escapeHtml(n.id) + '">SAVE</button> <button class="inline-btn danger sn-del" data-id="' + escapeHtml(n.id) + '">DEL</button></td>';
+        html += '</tr>';
+      }
+      $('s-nodes-body').innerHTML = html;
+      $('s-nodes-body').querySelectorAll('.sn-save').forEach(function (b) { b.addEventListener('click', onAdminNodeSave); });
+      $('s-nodes-body').querySelectorAll('.sn-del').forEach(function (b) { b.addEventListener('click', onAdminNodeDelete); });
+    }
+
+    function onAdminNodeSave(e) {
+      var id = e.target.dataset.id;
+      var row = e.target.closest('tr');
+      var name = row.querySelector('.sn-name').value.trim();
+      var type = row.querySelector('.sn-type').value;
+      fetch('/api/nodes/' + encodeURIComponent(id), {
+        method: 'PUT', headers: surveyAuthHeaders(),
+        body: JSON.stringify({ name: name, type: type })
+      }).then(function (r) { if (!r.ok) throw new Error('Save failed'); return r.json(); })
+        .then(loadAdminData)
+        .catch(function (err) { alert('Error: ' + err.message); });
+    }
+
+    function onAdminNodeDelete(e) {
+      var id = e.target.dataset.id;
+      if (!confirm('Delete node "' + id + '" and all its edges and POIs?')) return;
+      fetch('/api/nodes/' + encodeURIComponent(id), { method: 'DELETE', headers: surveyAuthHeaders() })
+        .then(function (r) { if (!r.ok) throw new Error('Delete failed'); return r.json(); })
+        .then(loadAdminData)
+        .catch(function (err) { alert('Error: ' + err.message); });
+    }
+
+    function renderAdminEdges() {
+      var html = '';
+      for (var i = 0; i < adminEdges.length; i++) {
+        var e = adminEdges[i];
+        var fn = (adminNodes.find(function (n) { return n.id === e.from_node_id; }) || {}).name || e.from_node_id;
+        var tn = (adminNodes.find(function (n) { return n.id === e.to_node_id; }) || {}).name || e.to_node_id;
+        html += '<tr>';
+        html += '<td>' + e.id + '</td>';
+        html += '<td><code>' + escapeHtml(e.from_node_id) + '</code> <span style="color:var(--color-muted)">' + escapeHtml(fn) + '</span></td>';
+        html += '<td><code>' + escapeHtml(e.to_node_id) + '</code> <span style="color:var(--color-muted)">' + escapeHtml(tn) + '</span></td>';
+        html += '<td>' + Math.round(e.weight) + '</td>';
+        html += '<td><select class="se-surface" data-id="' + e.id + '">' +
+          '<option value="paved"' + (e.surface_type === 'paved' ? ' selected' : '') + '>Paved</option>' +
+          '<option value="earthen"' + (e.surface_type === 'earthen' ? ' selected' : '') + '>Earthen</option>' +
+          '</select></td>';
+        html += '<td><button class="inline-btn se-save" data-id="' + e.id + '">SAVE</button> <button class="inline-btn danger se-del" data-id="' + e.id + '">DEL</button></td>';
+        html += '</tr>';
+      }
+      $('s-edges-body').innerHTML = html;
+      $('s-edges-body').querySelectorAll('.se-save').forEach(function (b) { b.addEventListener('click', onAdminEdgeSave); });
+      $('s-edges-body').querySelectorAll('.se-del').forEach(function (b) { b.addEventListener('click', onAdminEdgeDelete); });
+    }
+
+    function onAdminEdgeSave(e) {
+      var id = e.target.dataset.id;
+      var row = e.target.closest('tr');
+      var surface = row.querySelector('.se-surface').value;
+      fetch('/api/edges/' + id, {
+        method: 'PUT', headers: surveyAuthHeaders(),
+        body: JSON.stringify({ surface_type: surface })
+      }).then(function (r) { if (!r.ok) throw new Error('Save failed'); return r.json(); })
+        .then(loadAdminData)
+        .catch(function (err) { alert('Error: ' + err.message); });
+    }
+
+    function onAdminEdgeDelete(e) {
+      var id = e.target.dataset.id;
+      if (!confirm('Delete edge #' + id + '?')) return;
+      fetch('/api/edges/' + id, { method: 'DELETE', headers: surveyAuthHeaders() })
+        .then(function (r) { if (!r.ok) throw new Error('Delete failed'); return r.json(); })
+        .then(loadAdminData)
+        .catch(function (err) { alert('Error: ' + err.message); });
+    }
+
+    function renderAdminPois() {
+      var html = '';
+      for (var i = 0; i < adminPois.length; i++) {
+        var p = adminPois[i];
+        var nn = (adminNodes.find(function (n) { return n.id === p.node_id; }) || {}).name || p.node_id;
+        html += '<tr><td>' + p.id + '</td><td>' + escapeHtml(p.name) + '</td>';
+        html += '<td><code>' + escapeHtml(p.node_id) + '</code> <span style="color:var(--color-muted)">' + escapeHtml(nn) + '</span></td>';
+        html += '<td><button class="inline-btn danger sp-del" data-id="' + p.id + '">DEL</button></td></tr>';
+      }
+      $('s-pois-body').innerHTML = html;
+      $('s-pois-body').querySelectorAll('.sp-del').forEach(function (b) { b.addEventListener('click', onAdminPoiDelete); });
+    }
+
+    function onAdminPoiDelete(e) {
+      var id = e.target.dataset.id;
+      if (!confirm('Delete this POI?')) return;
+      fetch('/api/pois/' + id, { method: 'DELETE', headers: surveyAuthHeaders() })
+        .then(function (r) { if (!r.ok) throw new Error('Delete failed'); return r.json(); })
+        .then(loadAdminData)
+        .catch(function (err) { alert('Error: ' + err.message); });
+    }
+
+    function renderAdminPoiDropdown() {
+      var sel = $('s-poi-node');
+      sel.innerHTML = adminNodes.map(function (n) {
+        return '<option value="' + escapeHtml(n.id) + '">' + escapeHtml(n.name) + ' (' + escapeHtml(n.id) + ')</option>';
+      }).join('');
+    }
+
+    $('s-poi-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var nodeId = $('s-poi-node').value;
+      var name = $('s-poi-name').value.trim();
+      if (!name) { alert('Enter a POI name.'); return; }
+      fetch('/api/pois', {
+        method: 'POST', headers: surveyAuthHeaders(),
+        body: JSON.stringify({ name: name, node_id: nodeId })
+      }).then(function (r) { if (!r.ok) return r.json().then(function (j) { throw new Error(j.error); }); return r.json(); })
+        .then(function () { $('s-poi-name').value = ''; loadAdminData(); })
+        .catch(function (err) { alert('Error: ' + err.message); });
+    });
+
+    function renderAdminConnectivity() {
+      var edgeNodeIds = new Set();
+      adminEdges.forEach(function (e) { edgeNodeIds.add(e.from_node_id); edgeNodeIds.add(e.to_node_id); });
+      var isolated = adminNodes.filter(function (n) { return !edgeNodeIds.has(n.id); });
+      var html = '';
+      if (isolated.length === 0) {
+        html += '<p class="ok">All ' + adminNodes.length + ' nodes are connected to at least one edge.</p>';
+      } else {
+        html += '<p class="bad">' + isolated.length + ' node(s) have no edges:</p><ul>';
+        for (var i = 0; i < isolated.length; i++) {
+          html += '<li class="bad">' + escapeHtml(isolated[i].name) + ' (' + escapeHtml(isolated[i].id) + ')</li>';
+        }
+        html += '</ul>';
+      }
+      html += '<p style="margin-top:var(--space-sm);font-size:0.78rem;color:var(--color-muted);">Total edges: ' + adminEdges.length + ' &middot; Connected nodes: ' + edgeNodeIds.size + ' of ' + adminNodes.length + '</p>';
+      $('s-conn-list').innerHTML = html;
+    }
+
+    // ── Admin Panel toggle ──────────────────────────────
+    $('admin-toggle-btn').addEventListener('click', function () {
+      var panel = $('survey-admin-panel');
+      var hidden = panel.style.display === 'none';
+      panel.style.display = hidden ? 'block' : 'none';
+      this.textContent = hidden ? 'HIDE ADMIN PANEL' : 'SHOW ADMIN PANEL';
+      if (hidden) loadAdminData();
+    });
+
+    // ══════════════════════════════════════════════════════════════
   </script>
 </body>
 </html>

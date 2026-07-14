@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const { haversineDistance, MinHeap, findNearestNode, aStar, dijkstra, generateDirections } = require('./public/router.js');
 const { getDb, queryAll, queryOne, execute, executeRaw, runInTransaction } = require('./database');
 
 const app = express();
@@ -96,6 +97,58 @@ app.get('/api/pois/search', (req, res) => {
   res.json(
     queryAll('SELECT * FROM pois WHERE LOWER(name) LIKE ?', [`%${q.toLowerCase()}%`])
   );
+});
+
+// ─── Routing endpoints (A* and Dijkstra) ──────────────────────
+
+function buildGraphFromDb() {
+  return {
+    nodes: queryAll('SELECT * FROM nodes'),
+    edges: queryAll('SELECT * FROM edges')
+  };
+}
+
+/**
+ * GET /api/route/a-star?from=node_id&to=node_id
+ * GET /api/route/dijkstra?from=node_id&to=node_id
+ *
+ * Compute the shortest path using the requested algorithm.
+ * Returns { path: [...], distance: number, algorithm: string }
+ * or { error: '...' } with appropriate HTTP status.
+ */
+app.get('/api/route/:algorithm', (req, res) => {
+  const algorithm = req.params.algorithm;
+  if (algorithm !== 'a-star' && algorithm !== 'dijkstra') {
+    return res.status(400).json({ error: 'Algorithm must be "a-star" or "dijkstra"' });
+  }
+
+  const { from, to } = req.query;
+  if (!from || !to) {
+    return res.status(400).json({ error: 'Query parameters "from" and "to" (node IDs) are required' });
+  }
+
+  const graph = buildGraphFromDb();
+
+  if (!graph.nodes.find((n) => n.id === from)) {
+    return res.status(404).json({ error: 'Start node "' + from + '" not found' });
+  }
+  if (!graph.nodes.find((n) => n.id === to)) {
+    return res.status(404).json({ error: 'Destination node "' + to + '" not found' });
+  }
+
+  const fn = algorithm === 'a-star' ? aStar : dijkstra;
+  const result = fn(graph, from, to);
+
+  if (!result) {
+    return res.status(404).json({ error: 'No path found between the given nodes' });
+  }
+
+  res.json({
+    algorithm: algorithm,
+    path: result.path,
+    distance: result.distance,
+    directions: generateDirections(result.path)
+  });
 });
 
 app.post('/api/nodes', requireAuth, writeLimiter, (req, res) => {
@@ -320,6 +373,13 @@ app.put('/api/edges/:id', requireAuth, writeLimiter, (req, res) => {
     execute('UPDATE edges SET surface_type = ? WHERE id = ?', [surface_type, req.params.id]);
   }
   res.json(queryOne('SELECT * FROM edges WHERE id = ?', [req.params.id]));
+});
+
+app.delete('/api/edges/:id', requireAuth, writeLimiter, (req, res) => {
+  const edge = queryOne('SELECT * FROM edges WHERE id = ?', [req.params.id]);
+  if (!edge) return res.status(404).json({ error: 'Edge not found' });
+  execute('DELETE FROM edges WHERE id = ?', [req.params.id]);
+  res.json({ deleted: parseInt(req.params.id, 10) });
 });
 
 // ─── New: POI delete ───────────────────────────────────────────

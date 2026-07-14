@@ -296,9 +296,256 @@ img { max-width: 100%; display: block; }
   color: var(--color-muted);
 }
 
+/* — Gamified marquee ticker — */
+.marquee {
+  background: var(--color-text);
+  color: var(--color-surface);
+  border-bottom: var(--border-thick);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 6px 0;
+}
+
+.marquee-track {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 22s linear infinite;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+
+.marquee-track span {
+  margin: 0 var(--space-md);
+  color: var(--color-accent);
+}
+
+.marquee-track span:nth-child(even) { color: var(--color-surface); }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* — Hero badge + CTAs — */
+.hero-badge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  background: var(--color-text);
+  color: var(--color-surface);
+  padding: 4px 10px;
+  border: var(--border-medium);
+  transform: rotate(-2deg);
+  margin-bottom: var(--space-sm);
+}
+
+.hero-cta-row {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.cta-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.cta-secondary:hover { background: var(--color-accent-subtle); }
+
+/* — Hero level chip — */
+.hero-level {
+  position: absolute;
+  bottom: -14px;
+  right: -10px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--color-surface);
+  border: var(--border-thick);
+  box-shadow: var(--shadow-hard-sm);
+  padding: var(--space-xs) var(--space-sm);
+  transform: rotate(2deg);
+  max-width: 70%;
+}
+
+.level-pin { font-size: 1.4rem; line-height: 1; }
+
+.level-text {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.level-text strong { font-family: var(--font-display); color: var(--color-accent); }
+
+/* — Mission / progress — */
+.mission {
+  padding: var(--space-xl) var(--space-md);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.mission-head { margin-bottom: var(--space-lg); }
+
+.mission-sub {
+  font-size: 0.92rem;
+  color: var(--color-muted);
+  max-width: 52ch;
+  margin-top: var(--space-sm);
+  line-height: 1.65;
+}
+
+.progress-card {
+  border: var(--border-thick);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard);
+  padding: var(--space-md);
+  transform: rotate(-0.5deg);
+  margin-bottom: var(--space-lg);
+}
+
+.progress-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-sm);
+}
+
+.progress-label {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+}
+
+.progress-pct {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--color-accent);
+  line-height: 1;
+}
+
+.progress-bar {
+  height: 22px;
+  border: var(--border-medium);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-accent),
+    var(--color-accent) 8px,
+    #e8632c 8px,
+    #e8632c 16px
+  );
+  transition: width 0.4s ease;
+}
+
+.progress-note {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  margin-top: var(--space-sm);
+}
+
+.progress-note a { text-decoration: underline; text-underline-offset: 3px; }
+
+/* — Badges — */
+.badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-sm);
+}
+
+.badge {
+  border: var(--border-thick);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
+  padding: var(--space-sm);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge.locked { opacity: 0.55; filter: grayscale(0.6); }
+
+.badge.earned { transform: rotate(-1deg); }
+
+.badge-icon { font-size: 2rem; line-height: 1; }
+
+.badge-name {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.badge-desc {
+  font-size: 0.7rem;
+  color: var(--color-muted);
+}
+
+/* — Choose your weapon (algorithm) — */
+.weapon {
+  padding: 0 var(--space-md) var(--space-xl);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.weapon-sub {
+  font-size: 0.92rem;
+  color: var(--color-muted);
+  margin: var(--space-sm) 0 var(--space-lg);
+  max-width: 52ch;
+  line-height: 1.65;
+}
+
+.weapon-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.weapon-card {
+  border: var(--border-thick);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hard);
+  padding: var(--space-md);
+  transform: rotate(var(--step-rotation, 0deg));
+}
+
+.weapon-tag {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  background: var(--color-accent-subtle);
+  border: var(--border-medium);
+  padding: 2px 8px;
+  margin-bottom: var(--space-sm);
+}
+
+.weapon-name {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin-bottom: var(--space-sm);
+  color: var(--color-accent);
+}
+
+.weapon-desc {
+  font-size: 0.85rem;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+
 /* ============================================================
-   5.  NAVIGATE / APP PAGE
-   ============================================================ */
+    5.  NAVIGATE / APP PAGE
+    ============================================================ */
 body.navigate {
   height: 100vh;
   height: 100dvh;
@@ -443,6 +690,45 @@ body.navigate {
 
 #results-list li:hover {
   background: var(--color-accent-subtle);
+}
+
+/* — Algorithm picker (A* vs Dijkstra) — */
+.algo-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px dashed var(--color-border);
+}
+
+.algo-label {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.algo-btn {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 4px 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-medium);
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.1s, color 0.1s, transform 0.1s;
+}
+
+.algo-btn:hover { transform: translate(-1px, -1px); }
+
+.algo-btn.active {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-hard-sm);
 }
 
 /* — Map — */
@@ -1118,9 +1404,161 @@ body.survey { padding: 0; }
 .connectivity-list .ok { color: var(--color-safe); }
 .connectivity-list .bad { color: var(--color-accent); font-weight: 700; }
 
+/* — Building registry (admin.html) — */
+.admin-intro {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  background: var(--color-accent-subtle);
+  border: var(--border-thick);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.admin-intro strong { color: var(--color-accent); }
+
+.building-form {
+  background: var(--color-surface);
+  border: var(--border-thick);
+  box-shadow: var(--shadow-hard-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.building-form .form-head {
+  font-size: 0.85rem;
+  padding: var(--space-xs) var(--space-sm);
+  margin: calc(-1 * var(--space-sm)) calc(-1 * var(--space-sm)) var(--space-sm);
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+
+.building-form label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.building-form label:first-of-type { margin-top: 0; }
+
+.building-form input,
+.building-form select {
+  width: 100%;
+  padding: var(--space-sm);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  border: var(--border-medium);
+  background: var(--color-bg);
+  -webkit-appearance: none;
+}
+
+.building-form select {
+  background: var(--color-bg)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231c1c1c' stroke-width='2' fill='none'/%3E%3C/svg%3E")
+    no-repeat right 14px center;
+  padding-right: 40px;
+}
+
+.coord-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.locate-fill {
+  width: 100%;
+  margin-top: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-medium);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.locate-fill:hover { background: var(--color-accent-subtle); }
+
+.form-msg {
+  margin-top: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: var(--border-medium);
+  display: none;
+}
+
+.form-msg.ok    { display: block; background: #e6f0e6; border-color: var(--color-safe); }
+.form-msg.error { display: block; background: #fce4d6; border-color: var(--color-accent); color: var(--color-accent); }
+
+.building-list { padding: var(--space-sm); }
+
+.empty-note {
+  font-size: 0.82rem;
+  color: var(--color-muted);
+  padding: var(--space-sm);
+}
+
+.building-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--border-medium);
+  margin-bottom: var(--space-sm);
+  background: var(--color-bg);
+}
+
+.building-card:last-child { margin-bottom: 0; }
+
+.bc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.bc-name {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
+
+.bc-meta {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.bc-del { flex-shrink: 0; }
+
+/* — Back button (shared across pages) — */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-medium);
+  cursor: pointer;
+  line-height: 1;
+  text-decoration: none;
+  transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
+}
+
+.back-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-hard-sm);
+  background: var(--color-accent-subtle);
+}
+
 /* ============================================================
-   8.  RESPONSIVE
-   ============================================================ */
+    8.  RESPONSIVE
+    ============================================================ */
 
 @media (max-width: 800px) {
   .hero {
@@ -1137,6 +1575,13 @@ body.survey { padding: 0; }
   }
 
   .step { transform: none !important; }
+
+  .weapon-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .weapon-card { transform: none !important; }
 
   .nav-site-name { display: none; }
 }

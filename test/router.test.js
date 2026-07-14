@@ -12,6 +12,7 @@ const {
   MinHeap,
   findNearestNode,
   aStar,
+  dijkstra,
   generateDirections
 } = require('../public/router.js');
 
@@ -209,6 +210,62 @@ describe('aStar', function () {
     const result = aStar(g, 'A', 'D');
     assert.ok(result !== null);
     assert.strictEqual(result.distance, 222);
+  });
+});
+
+describe('dijkstra', function () {
+  it('should find the shortest path A → D', function () {
+    const result = dijkstra(syntheticGraph, 'A', 'D');
+    assert.ok(result !== null);
+    const pathIds = result.path.map((n) => n.id);
+    // Dijkstra uses only edge weights, so it also finds A→C→D
+    assert.deepStrictEqual(pathIds, ['A', 'C', 'D']);
+  });
+
+  it('should return the correct total distance', function () {
+    const result = dijkstra(syntheticGraph, 'A', 'D');
+    const expected =
+      distBetween(syntheticNodes[0], syntheticNodes[2]) +
+      distBetween(syntheticNodes[2], syntheticNodes[3]);
+    assert.strictEqual(result.distance, expected);
+  });
+
+  it('should handle direct neighbours', function () {
+    const result = dijkstra(syntheticGraph, 'A', 'B');
+    assert.ok(result !== null);
+    assert.deepStrictEqual(result.path.map((n) => n.id), ['A', 'B']);
+    assert.strictEqual(result.distance, distBetween(syntheticNodes[0], syntheticNodes[1]));
+  });
+
+  it('should return the same node when start === end', function () {
+    const result = dijkstra(syntheticGraph, 'B', 'B');
+    assert.ok(result !== null);
+    assert.deepStrictEqual(result.path.map((n) => n.id), ['B']);
+    assert.strictEqual(result.distance, 0);
+  });
+
+  it('should return null when the graph is disconnected', function () {
+    const disconnectedGraph = {
+      nodes: syntheticNodes,
+      edges: [{ from_node_id: 'A', to_node_id: 'B', weight: 100 }]
+    };
+    const result = dijkstra(disconnectedGraph, 'A', 'D');
+    assert.strictEqual(result, null);
+  });
+
+  it('should return null for non-existent node IDs', function () {
+    const result = dijkstra(syntheticGraph, 'A', 'Z');
+    assert.strictEqual(result, null);
+  });
+
+  it('should match A* result on this graph', function () {
+    const a = aStar(syntheticGraph, 'A', 'D');
+    const d = dijkstra(syntheticGraph, 'A', 'D');
+    assert.strictEqual(d.distance, a.distance);
+    assert.deepStrictEqual(
+      d.path.map((n) => n.id),
+      a.path.map((n) => n.id)
+    );
   });
 });
 

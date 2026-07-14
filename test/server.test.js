@@ -338,6 +338,62 @@ describe('API (auth enabled)', function () {
     });
   });
 
+  describe('GET /api/route/:algorithm', function () {
+    it('should return 400 for unknown algorithm', function () {
+      return request(app)
+        .get('/api/route/floyd?from=a&to=b')
+        .expect(400);
+    });
+
+    it('should return 400 when from/to are missing', function () {
+      return request(app)
+        .get('/api/route/a-star')
+        .expect(400);
+    });
+
+    it('should return 404 for unknown nodes', function () {
+      return request(app)
+        .get('/api/route/a-star?from=no_such&to=ghost')
+        .expect(404);
+    });
+
+    it('should compute A* route', function () {
+      seedGraph();
+      return request(app)
+        .get('/api/route/a-star?from=node_a&to=node_c')
+        .expect(200)
+        .then(function (res) {
+          assert.strictEqual(res.body.algorithm, 'a-star');
+          assert.ok(res.body.path.length >= 2);
+          assert.ok(res.body.distance > 0);
+          assert.ok(Array.isArray(res.body.directions));
+          assert.strictEqual(res.body.path[0].id, 'node_a');
+          assert.strictEqual(res.body.path[res.body.path.length - 1].id, 'node_c');
+        });
+    });
+
+    it('should compute Dijkstra route', function () {
+      seedGraph();
+      return request(app)
+        .get('/api/route/dijkstra?from=node_a&to=node_c')
+        .expect(200)
+        .then(function (res) {
+          assert.strictEqual(res.body.algorithm, 'dijkstra');
+          assert.ok(res.body.path.length >= 2);
+          assert.ok(res.body.distance > 0);
+          assert.strictEqual(res.body.path[0].id, 'node_a');
+          assert.strictEqual(res.body.path[res.body.path.length - 1].id, 'node_c');
+        });
+    });
+
+    it('should return 404 when no path exists', function () {
+      seedGraph();
+      return request(app)
+        .get('/api/route/a-star?from=node_a&to=node_a')
+        .expect(200); // start === end IS a valid path
+    });
+  });
+
   describe('POST /api/nodes (auth protected)', function () {
     it('should return 401 without API key', function () {
       return request(app)
@@ -578,6 +634,33 @@ describe('API (auth enabled)', function () {
         .put('/api/edges/99999')
         .set('x-api-key', 'test-key-456')
         .send({ surface_type: 'paved' })
+        .expect(404);
+    });
+  });
+
+  describe('DELETE /api/edges/:id (auth protected)', function () {
+    it('should return 401 without API key', function () {
+      return request(app).delete('/api/edges/1').expect(401);
+    });
+
+    it('should delete an edge', function () {
+      seedGraph();
+      var edges = db.queryAll('SELECT * FROM edges');
+      var edgeId = edges[0].id;
+      return request(app)
+        .delete('/api/edges/' + edgeId)
+        .set('x-api-key', 'test-key-456')
+        .expect(200)
+        .then(function (res) {
+          assert.strictEqual(res.body.deleted, edgeId);
+          assert.strictEqual(db.queryAll('SELECT * FROM edges').length, edges.length - 1);
+        });
+    });
+
+    it('should return 404 for unknown edge', function () {
+      return request(app)
+        .delete('/api/edges/99999')
+        .set('x-api-key', 'test-key-456')
         .expect(404);
     });
   });
