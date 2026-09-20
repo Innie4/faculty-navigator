@@ -1,4 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": "echo 'no install needed for a static site'",
   "outputDirectory": "public",
   "rewrites": [
     {
