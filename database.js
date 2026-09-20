@@ -1,145 +1,140 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-const DB_PATH = process.env.FACULTY_DB_PATH || path.join(__dirname, 'faculty.db');
-
-let db = null;
-let SQL = null;
+let pool = null;
 
 /**
- * Initialise (or re-open) the SQLite database.
- * sql.js is pure WASM — no native compilation needed.
- * We manually persist to a file after every write operation.
+ * Build the connection pool from DATABASE_URL (a Postgres connection
+ * string — in production this is a Supabase project's connection
+ * string; in dev/test it can point at any local or containerised
+ * Postgres). SSL is required by Supabase but not by a local instance.
+ */
+function createPool() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'DATABASE_URL environment variable is required (a Postgres connection string, e.g. from Supabase).'
+    );
+  }
+  const isLocal = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+  return new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: isLocal ? false : { rejectUnauthorized: false }
+  });
+}
+
+/**
+ * Convert the `?` placeholders every caller uses into Postgres'
+ * positional `$1, $2, …` placeholders.
+ */
+function toPgQuery(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+/**
+ * Initialise (or re-use) the connection pool and make sure the schema
+ * exists. Safe to call repeatedly — CREATE TABLE IF NOT EXISTS is a
+ * no-op once the tables are there.
  */
 async function getDb() {
-  if (!db) {
-    SQL = await initSqlJs();
-
-    if (fs.existsSync(DB_PATH)) {
-      const buffer = fs.readFileSync(DB_PATH);
-      db = new SQL.Database(buffer);
-    } else {
-      db = new SQL.Database();
-    }
-
-    db.run('PRAGMA foreign_keys = ON');
-    initializeSchema();
+  if (!pool) {
+    pool = createPool();
+    await initializeSchema();
   }
-  return db;
+  return pool;
 }
 
-/**
- * Persist the in-memory database to disk.
- */
-function saveDb() {
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
-}
-
-function initializeSchema() {
-  db.run(`
+async function initializeSchema() {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS nodes (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      lat REAL NOT NULL,
-      lng REAL NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('building_entrance', 'junction', 'gate', 'turning_point'))
+      lat DOUBLE PRECISION NOT NULL,
+      lng DOUBLE PRECISION NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('building_entrance', 'junction', 'gate', 'turning_point'))
     )
   `);
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS edges (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       from_node_id TEXT NOT NULL REFERENCES nodes(id),
       to_node_id TEXT NOT NULL REFERENCES nodes(id),
-      weight REAL NOT NULL,
-      surface_type TEXT NOT NULL CHECK(surface_type IN ('paved', 'earthen')),
-      UNIQUE(from_node_id, to_node_id)
+      weight DOUBLE PRECISION NOT NULL,
+      surface_type TEXT NOT NULL CHECK (surface_type IN ('paved', 'earthen')),
+      UNIQUE (from_node_id, to_node_id)
     )
   `);
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS pois (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       node_id TEXT NOT NULL REFERENCES nodes(id)
     )
   `);
-  saveDb();
 }
 
 /**
  * Run a query and return all matching rows as objects.
  */
-function queryAll(sql, params = []) {
-  const stmt = db.prepare(sql);
-  if (params.length > 0) stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
+async function queryAll(sql, params = []) {
+  const res = await pool.query(toPgQuery(sql), params);
+  return res.rows;
 }
 
 /**
  * Run a query and return the first matching row, or undefined.
  */
-function queryOne(sql, params = []) {
-  const rows = queryAll(sql, params);
+async function queryOne(sql, params = []) {
+  const rows = await queryAll(sql, params);
   return rows.length > 0 ? rows[0] : undefined;
 }
 
 /**
- * Execute a write statement and save the DB.
+ * Build an exec(sql, params) function bound to a given query runner
+ * (the pool for one-off writes, or a checked-out client for writes
+ * inside a transaction). INSERT statements get `RETURNING id` appended
+ * automatically so callers keep getting { affectedRows, insertId } —
+ * Postgres has no SQLite-style last_insert_rowid().
  */
-function execute(sql, params = []) {
-  db.run(sql, params);
-  saveDb();
-  return {
-    affectedRows: db.getRowsModified(),
-    insertId: queryOne('SELECT last_insert_rowid() AS id')?.id
+function buildExec(runner) {
+  return async function exec(sql, params = []) {
+    const trimmed = sql.trim();
+    const isInsert = /^insert/i.test(trimmed) && !/returning/i.test(trimmed);
+    const finalSql = isInsert ? `${trimmed} RETURNING id` : trimmed;
+    const res = await runner(toPgQuery(finalSql), params);
+    return {
+      affectedRows: res.rowCount,
+      insertId: isInsert && res.rows[0] ? res.rows[0].id : undefined
+    };
   };
 }
 
-/**
- * Execute a write statement WITHIN a transaction (no auto-save).
- * Caller is responsible for saveDb() after COMMIT.
- */
-function executeRaw(sql, params = []) {
-  db.run(sql, params);
-  return {
-    affectedRows: db.getRowsModified(),
-    insertId: queryOne('SELECT last_insert_rowid() AS id')?.id
-  };
-}
+const execute = buildExec((sql, params) => pool.query(sql, params));
 
 /**
- * Run a batch of operations inside a single SQLite transaction.
- * If any operation fails, all changes are rolled back and the
- * database file is never touched — the DB stays in its pre-batch
- * state. This prevents partial updates from a failed survey save.
+ * Run a batch of operations inside a single Postgres transaction on
+ * one dedicated client. If the callback throws, every change made
+ * through its `exec` is rolled back and nothing is committed — this
+ * prevents partial updates from a failed survey save.
  *
- * @param {function} callback — receives (executeRaw) as its arg.
- *   Inside the callback, use executeRaw(sql, params) for all writes.
- * @returns {any} — whatever the callback returned.
+ * @param {function} callback — receives (exec) as its arg; exec has
+ *   the same (sql, params) => {affectedRows, insertId} shape as
+ *   execute(), but runs on the transaction's own client.
+ * @returns {Promise<any>} whatever the callback resolved to.
  */
-function runInTransaction(callback) {
-  // Snapshot current state in case we need to roll back
-  const snapshot = db.export();
-
-  db.run('BEGIN');
+async function runInTransaction(callback) {
+  const client = await pool.connect();
+  const exec = buildExec((sql, params) => client.query(sql, params));
   try {
-    const result = callback(executeRaw);
-    db.run('COMMIT');
-    saveDb(); // persist once after the whole transaction succeeds
+    await client.query('BEGIN');
+    const result = await callback(exec);
+    await client.query('COMMIT');
     return result;
   } catch (err) {
-    // Roll back: restore from the pre-transaction snapshot
-    db = new SQL.Database(snapshot);
-    db.run('PRAGMA foreign_keys = ON');
-    saveDb(); // over-write with pre-transaction state
+    await client.query('ROLLBACK');
     throw err;
+  } finally {
+    client.release();
   }
 }
 
-module.exports = { getDb, queryAll, queryOne, execute, executeRaw, runInTransaction, saveDb };
+module.exports = { getDb, queryAll, queryOne, execute, runInTransaction };

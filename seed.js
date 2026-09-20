@@ -11,8 +11,8 @@ const { getDb, queryAll } = require('./database');
  * To restore the old example dataset for demo purposes, run:
  *   node seed-example.js
  */
-function seedIfEmpty() {
-  const rows = queryAll('SELECT COUNT(*) AS c FROM nodes');
+async function seedIfEmpty() {
+  const rows = await queryAll('SELECT COUNT(*)::int AS c FROM nodes');
   if (rows[0].c === 0) {
     console.log('Database is empty. Use /survey.html to capture real data,');
     console.log('or run `node seed-example.js` to load the demo dataset.');
@@ -24,8 +24,13 @@ function seedIfEmpty() {
 module.exports = { seedIfEmpty };
 
 if (require.main === module) {
-  getDb().then(() => {
-    seedIfEmpty();
-    console.log('Done.');
-  });
+  getDb()
+    .then(async () => {
+      await seedIfEmpty();
+      console.log('Done.');
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }

@@ -1,10 +1,21 @@
 # FindMyBlock
 
-A GPS-driven campus navigation system for university students. Built with **vanilla JavaScript**, **Node.js / Express**, **SQLite**, and **Leaflet.js** — zero build tools, zero frameworks, zero external services.
+A GPS-driven campus navigation system for university students. Built with **vanilla JavaScript**, **Node.js / Express**, **Postgres (Supabase)**, and **Leaflet.js** — zero build tools, zero frontend frameworks.
+
+In production this runs as three separate pieces:
+- **Frontend** — the static `public/` folder, hosted on **Vercel**.
+- **Backend** — the Express API in this repo, hosted on **Render**.
+- **Database** — **Supabase** Postgres, so surveyed locations persist centrally instead of in a local file.
+
+See [Deployment](#deployment-vercel--render--supabase) below for the full setup. For local development, everything can run on one machine (see Quick Start).
 
 ## Quick Start
 
+You need a reachable Postgres instance. The easiest way locally is Docker:
+
 ```bash
+docker compose up -d          # starts Postgres on localhost:5432
+cp .env.example .env          # then set DATABASE_URL=postgresql://postgres:postgres@localhost:5432/faculty_navigator
 npm install
 npm start
 ```
@@ -31,11 +42,14 @@ This loads a fictional faculty layout near Uyo, Akwa Ibom State, Nigeria, so you
 ```
 faculty-navigator/
 ├── package.json              # Dependencies & scripts
-├── server.js                 # Express server + REST endpoints
-├── database.js               # SQLite schema + connection helper
+├── server.js                 # Express API (CORS + REST endpoints)
+├── database.js                # Postgres schema + query helpers (pg)
 ├── seed.js                   # Startup checks (no auto-data)
 ├── seed-example.js           # Standalone demo dataset script
-├── public/
+├── docker-compose.yml        # Local Postgres for dev + test
+├── docker/init-test-db.sql   # Creates the test database on first run
+├── vercel.json                # Frontend deploy config (proxies /api/* to Render)
+├── public/                   # Deployed to Vercel as a static site
 │   ├── index.html            # Landing page (hero, about, CTA)
 │   ├── navigate.html         # Map + routing interface
 │   ├── survey.html           # Field data collection tool
@@ -44,7 +58,8 @@ faculty-navigator/
 │   ├── app.js                # Map/routing frontend controller
 │   └── router.js             # A* engine + MinHeap + Haversine
 ├── test/
-│   └── router.test.js        # Unit tests for the routing engine
+│   ├── router.test.js        # Unit tests for the routing engine
+│   └── server.test.js        # Integration tests (needs Postgres)
 └── README.md
 ```
 
@@ -149,15 +164,22 @@ Because `h(n)` is admissible (never overestimates), the first time the goal is p
 
 ## Running Tests
 
+The integration suite (`test/server.test.js`) needs a real Postgres to run against — it exercises actual transactions, foreign keys, and constraints, so it doesn't run against a mock:
+
 ```bash
+docker compose up -d   # if not already running — also creates faculty_navigator_test
 npm test
 ```
+
+By default tests connect to `postgresql://postgres:postgres@localhost:5432/faculty_navigator_test` (created automatically by `docker-compose.yml`). Point elsewhere with `TEST_DATABASE_URL`. Tables are wiped between tests; nothing here touches your dev or production data as long as this points at a dedicated test database.
 
 The test suite validates:
 - MinHeap: insertion order, extraction, size tracking, duplicate scores
 - Haversine distance: zero distance, known distances, approximate correctness
 - `findNearestNode`: basic selection, single-element, empty array
 - A\*: shortest path, path distance, self-loop, disconnected graph, missing nodes, equal-cost alternatives
+- Database layer: queries, inserts/updates/deletes, foreign-key enforcement, transaction commit/rollback
+- Every REST endpoint, with and without `API_KEY` auth
 
 ## Extending to a Full Campus
 
@@ -171,11 +193,14 @@ No code changes are needed — the A\* algorithm works on any connected graph.
 
 ## Configuration (Environment Variables)
 
+See [`.env.example`](.env.example) for the full annotated list. Summary:
+
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `3000` | HTTP server port |
+| `PORT` | `3000` | HTTP server port. Render sets this automatically in production. |
 | `TRUST_PROXY` | *(unset)* | Set when deployed behind a reverse proxy (Render, Railway, Heroku, nginx) — e.g. `1` — so express-rate-limit reads the real client IP instead of the proxy's |
-| `FACULTY_DB_PATH` | `./faculty.db` | Path to the SQLite database file |
+| `DATABASE_URL` | *(required)* | Postgres connection string (Supabase in production; local/Docker Postgres in dev) |
+| `CORS_ORIGIN` | *(unset = allow any origin)* | Comma-separated list of frontend origin(s) allowed to call this API (your Vercel URL) |
 | `API_KEY` | *(unset)* | If set, all POST / PUT / DELETE endpoints require `x-api-key` header |
 
 ### Auth behaviour
@@ -196,7 +221,29 @@ All `/api/*` routes are rate-limited per IP:
 
 When exceeded the server returns `{ "error": "Too many requests — try again later." }` with status `429`.
 
+## Deployment (Vercel + Render + Supabase)
+
+### 1. Database — Supabase
+1. Create a project at [supabase.com](https://supabase.com).
+2. Go to **Project Settings → Database → Connection string** and copy the URI (session pooler or direct connection — not the transaction pooler, since this app runs real `BEGIN`/`COMMIT` transactions for survey saves).
+3. That string is your `DATABASE_URL`. The app creates its own tables on first startup (`CREATE TABLE IF NOT EXISTS …` in [`database.js`](database.js)) — no manual migration step needed.
+
+### 2. Backend — Render
+1. Create a **Web Service** on [render.com](https://render.com), pointed at this repo.
+2. Build command: `npm install`. Start command: `npm start`.
+3. Add the environment variables from [`.env.example`](.env.example): `DATABASE_URL` (from Supabase), `TRUST_PROXY=1`, `CORS_ORIGIN` (your Vercel URL — you can add it after step 3), and `API_KEY` if you want write endpoints locked down. Leave `PORT` unset — Render supplies it.
+4. Deploy, then note the public URL Render gives you (e.g. `https://findmyblock-api.onrender.com`).
+5. Optionally run `npm run seed-example` once against this environment (e.g. via Render's shell) to load demo data.
+
+### 3. Frontend — Vercel
+1. Edit [`vercel.json`](vercel.json): replace `https://YOUR-RENDER-BACKEND.onrender.com` with your actual Render URL from step 2.
+2. Import this repo into [vercel.com](https://vercel.com). No build command is needed — `vercel.json`'s `outputDirectory: "public"` tells Vercel to serve `public/` as-is.
+3. Deploy, then note the Vercel URL (e.g. `https://findmyblock.vercel.app`).
+4. Go back to Render and set `CORS_ORIGIN` to that Vercel URL (comma-separate if you also want to allow a preview domain), then redeploy the backend.
+
+Because `vercel.json` rewrites `/api/*` to Render, the frontend's existing `fetch('/api/...')` calls need no code changes — from the browser's point of view, the API is same-origin. `CORS_ORIGIN` is still worth setting for defense-in-depth (e.g. if something hits the Render URL directly).
+
 ## Remaining Production Notes
 
 - **Input sanitisation** and request size limits (`express.json({ limit: '2mb' })` already protects against oversized payloads).
-- **HTTPS** via a reverse proxy (nginx / Caddy) or using Render/Railway's built-in TLS.
+- **HTTPS** is handled automatically by both Vercel and Render.

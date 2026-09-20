@@ -1,38 +1,37 @@
 /**
  * Integration tests for database.js and server.js.
  *
- * Uses a temporary SQLite database (test-faculty.db) and supertest
- * to exercise every API endpoint with and without authentication.
+ * Requires a reachable Postgres instance — set TEST_DATABASE_URL (or
+ * DATABASE_URL) before running, or rely on the local default below
+ * (postgres/postgres on localhost, matching docker-compose.test.yml).
+ * Tables are wiped between tests; nothing here touches your real data
+ * as long as TEST_DATABASE_URL points at a dedicated test database.
  */
 const assert = require('assert');
-const path = require('path');
-const fs = require('fs');
 const request = require('supertest');
 
-const TEST_DB = path.join(__dirname, 'test-faculty.db');
-
-// ── Clean up leftover test DB before setting env ─────────────
-try { fs.unlinkSync(TEST_DB); } catch (_) {}
-
-process.env.FACULTY_DB_PATH = TEST_DB;
+process.env.DATABASE_URL =
+  process.env.TEST_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@localhost:5432/faculty_navigator_test';
 process.env.API_KEY = 'test-key-456';
 
 const app = require('../server');
 const db = require('../database');
 
 // ── Helper: seed a minimal graph ────────────────────────────
-function seedGraph() {
-  db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+async function seedGraph() {
+  await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
     ['node_a', 'Node A', 5.0, 7.9, 'gate']);
-  db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+  await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
     ['node_b', 'Node B', 5.001, 7.901, 'junction']);
-  db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+  await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
     ['node_c', 'Node C', 5.002, 7.902, 'building_entrance']);
-  db.execute('INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)',
+  await db.execute('INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)',
     ['node_a', 'node_b', 150, 'paved']);
-  db.execute('INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)',
+  await db.execute('INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)',
     ['node_b', 'node_c', 150, 'earthen']);
-  db.execute('INSERT INTO pois (name, node_id) VALUES (?, ?)',
+  await db.execute('INSERT INTO pois (name, node_id) VALUES (?, ?)',
     ['Computer Science Dept', 'node_c']);
 }
 
@@ -46,146 +45,142 @@ describe('Database', function () {
     return db.getDb();
   });
 
-  beforeEach(function () {
-    db.execute('DELETE FROM pois');
-    db.execute('DELETE FROM edges');
-    db.execute('DELETE FROM nodes');
+  beforeEach(async function () {
+    await db.execute('DELETE FROM pois');
+    await db.execute('DELETE FROM edges');
+    await db.execute('DELETE FROM nodes');
   });
 
   describe('getDb', function () {
-    it('should return a database object', function () {
-      return db.getDb().then(function (d) {
-        assert.ok(d);
-        assert.ok(d.run);
-        assert.ok(d.exec);
+    it('should return a connection pool', function () {
+      return db.getDb().then(function (pool) {
+        assert.ok(pool);
+        assert.strictEqual(typeof pool.query, 'function');
+        assert.strictEqual(typeof pool.connect, 'function');
       });
     });
   });
 
   describe('queryAll', function () {
-    it('should return an empty array for an empty table', function () {
-      const rows = db.queryAll('SELECT * FROM nodes');
+    it('should return an empty array for an empty table', async function () {
+      const rows = await db.queryAll('SELECT * FROM nodes');
       assert.ok(Array.isArray(rows));
       assert.strictEqual(rows.length, 0);
     });
 
-    it('should return all rows after insert', function () {
-      db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should return all rows after insert', async function () {
+      await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['x', 'X', 1, 2, 'gate']);
-      const rows = db.queryAll('SELECT * FROM nodes');
+      const rows = await db.queryAll('SELECT * FROM nodes');
       assert.strictEqual(rows.length, 1);
       assert.strictEqual(rows[0].id, 'x');
     });
 
-    it('should accept bound parameters', function () {
-      db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should accept bound parameters', async function () {
+      await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['param_test', 'PT', 3, 4, 'junction']);
-      const rows = db.queryAll('SELECT * FROM nodes WHERE id = ?', ['param_test']);
+      const rows = await db.queryAll('SELECT * FROM nodes WHERE id = ?', ['param_test']);
       assert.strictEqual(rows.length, 1);
       assert.strictEqual(rows[0].name, 'PT');
     });
   });
 
   describe('queryOne', function () {
-    it('should return undefined for an empty table', function () {
-      const row = db.queryOne('SELECT * FROM nodes');
+    it('should return undefined for an empty table', async function () {
+      const row = await db.queryOne('SELECT * FROM nodes');
       assert.strictEqual(row, undefined);
     });
 
-    it('should return the first matching row', function () {
-      db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should return the first matching row', async function () {
+      await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['first', 'First', 0, 0, 'gate']);
-      const row = db.queryOne('SELECT * FROM nodes');
+      const row = await db.queryOne('SELECT * FROM nodes');
       assert.strictEqual(row.id, 'first');
     });
   });
 
   describe('execute', function () {
-    it('should insert a row and return insertId', function () {
-      const result = db.execute(
+    it('should insert a row and return insertId', async function () {
+      const result = await db.execute(
         'INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['ins_test', 'Inserted', 1.1, 2.2, 'gate']
       );
       assert.ok(result.insertId !== undefined);
-      const row = db.queryOne('SELECT * FROM nodes WHERE id = ?', ['ins_test']);
+      const row = await db.queryOne('SELECT * FROM nodes WHERE id = ?', ['ins_test']);
       assert.strictEqual(row.name, 'Inserted');
     });
 
-    it('should update a row', function () {
-      db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should update a row', async function () {
+      await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['upd', 'Old', 0, 0, 'gate']);
-      db.execute('UPDATE nodes SET name = ? WHERE id = ?', ['New', 'upd']);
-      const row = db.queryOne('SELECT * FROM nodes WHERE id = ?', ['upd']);
+      await db.execute('UPDATE nodes SET name = ? WHERE id = ?', ['New', 'upd']);
+      const row = await db.queryOne('SELECT * FROM nodes WHERE id = ?', ['upd']);
       assert.strictEqual(row.name, 'New');
     });
 
-    it('should delete a row', function () {
-      db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should delete a row', async function () {
+      await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['del', 'DeleteMe', 0, 0, 'gate']);
-      db.execute('DELETE FROM nodes WHERE id = ?', ['del']);
-      const row = db.queryOne('SELECT * FROM nodes WHERE id = ?', ['del']);
+      await db.execute('DELETE FROM nodes WHERE id = ?', ['del']);
+      const row = await db.queryOne('SELECT * FROM nodes WHERE id = ?', ['del']);
       assert.strictEqual(row, undefined);
     });
 
-    it('should handle insert with missing foreign key', function () {
-      // sql.js does not enforce FK constraints in all WASM builds,
-      // so we just verify the operation does not crash.
-      var before = db.queryAll('SELECT * FROM edges').length;
-      db.execute(
-        'INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)',
-        ['no_such_node', 'no_such_node2', 100, 'paved']
+    it('should reject an insert with a missing foreign key (Postgres enforces it)', async function () {
+      await assert.rejects(
+        db.execute(
+          'INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)',
+          ['no_such_node', 'no_such_node2', 100, 'paved']
+        )
       );
-      // sql.js may or may not enforce the FK — either way is OK
-      var after = db.queryAll('SELECT * FROM edges').length;
-      assert.ok(after === before || after === before + 1,
-        'Edge count should stay same or increase by 1, was ' + before + ' → ' + after);
-    });
-  });
-
-  describe('executeRaw', function () {
-    it('should execute within a transaction context', function () {
-      db.runInTransaction(function (exec) {
-        const r = exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
-          ['raw_test', 'Raw', 9, 9, 'gate']);
-        assert.ok(r.insertId !== undefined);
-      });
-      const row = db.queryOne('SELECT * FROM nodes WHERE id = ?', ['raw_test']);
-      assert.strictEqual(row.name, 'Raw');
     });
   });
 
   describe('runInTransaction', function () {
-    it('should commit all changes on success', function () {
-      var result = db.runInTransaction(function (exec) {
-        exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should commit all changes on success', async function () {
+      const result = await db.runInTransaction(async function (exec) {
+        await exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
           ['tx1', 'Tx1', 0, 0, 'gate']);
-        exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+        await exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
           ['tx2', 'Tx2', 0, 0, 'junction']);
         return 'done';
       });
       assert.strictEqual(result, 'done');
-      assert.strictEqual(db.queryAll('SELECT * FROM nodes').length, 2);
+      assert.strictEqual((await db.queryAll('SELECT * FROM nodes')).length, 2);
     });
 
-    it('should roll back all changes on application error', function () {
-      db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+    it('should return an insertId from exec() inside a transaction', async function () {
+      const result = await db.runInTransaction(async function (exec) {
+        const r = await exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+          ['raw_test', 'Raw', 9, 9, 'gate']);
+        assert.ok(r.insertId !== undefined);
+        return r;
+      });
+      assert.strictEqual(result.insertId, 'raw_test');
+      const row = await db.queryOne('SELECT * FROM nodes WHERE id = ?', ['raw_test']);
+      assert.strictEqual(row.name, 'Raw');
+    });
+
+    it('should roll back all changes on application error', async function () {
+      await db.execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
         ['existing', 'Existing', 0, 0, 'gate']);
 
-      assert.throws(function () {
-        db.runInTransaction(function (exec) {
-          exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
+      await assert.rejects(
+        db.runInTransaction(async function (exec) {
+          await exec('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)',
             ['tx_fail', 'ShouldRollback', 1, 1, 'gate']);
           // Throw deliberately to force rollback
           throw new Error('Simulated failure');
-        });
-      }, /Simulated failure/);
+        }),
+        /Simulated failure/
+      );
 
       // The node 'tx_fail' should NOT exist after rollback
-      var rollbackNode = db.queryOne('SELECT * FROM nodes WHERE id = ?', ['tx_fail']);
+      const rollbackNode = await db.queryOne('SELECT * FROM nodes WHERE id = ?', ['tx_fail']);
       assert.strictEqual(rollbackNode, undefined, 'Node should have been rolled back');
 
       // The existing node should still be there
-      var existing = db.queryOne('SELECT * FROM nodes WHERE id = ?', ['existing']);
+      const existing = await db.queryOne('SELECT * FROM nodes WHERE id = ?', ['existing']);
       assert.strictEqual(existing.name, 'Existing');
     });
   });
@@ -201,14 +196,10 @@ describe('API (auth enabled)', function () {
     return db.getDb();
   });
 
-  beforeEach(function () {
-    db.execute('DELETE FROM pois');
-    db.execute('DELETE FROM edges');
-    db.execute('DELETE FROM nodes');
-  });
-
-  after(function () {
-    try { fs.unlinkSync(TEST_DB); } catch (_) {}
+  beforeEach(async function () {
+    await db.execute('DELETE FROM pois');
+    await db.execute('DELETE FROM edges');
+    await db.execute('DELETE FROM nodes');
   });
 
   describe('GET /api/graph', function () {
@@ -224,8 +215,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should return seeded nodes and edges', function () {
-      seedGraph();
+    it('should return seeded nodes and edges', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/graph')
         .expect(200)
@@ -249,8 +240,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should return POIs after seeding', function () {
-      seedGraph();
+    it('should return POIs after seeding', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/pois')
         .expect(200)
@@ -271,8 +262,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should return matching POIs', function () {
-      seedGraph();
+    it('should return matching POIs', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/pois/search?q=Computer')
         .expect(200)
@@ -282,8 +273,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should be case-insensitive', function () {
-      seedGraph();
+    it('should be case-insensitive', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/pois/search?q=computer')
         .expect(200)
@@ -292,8 +283,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should return empty array for no match', function () {
-      seedGraph();
+    it('should return empty array for no match', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/pois/search?q=zzzzz')
         .expect(200)
@@ -310,8 +301,8 @@ describe('API (auth enabled)', function () {
         .expect(404);
     });
 
-    it('should return the node', function () {
-      seedGraph();
+    it('should return the node', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/nodes/node_a')
         .expect(200)
@@ -324,8 +315,8 @@ describe('API (auth enabled)', function () {
   });
 
   describe('GET /api/export', function () {
-    it('should return full DB dump', function () {
-      seedGraph();
+    it('should return full DB dump', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/export')
         .expect(200)
@@ -357,8 +348,8 @@ describe('API (auth enabled)', function () {
         .expect(404);
     });
 
-    it('should compute A* route', function () {
-      seedGraph();
+    it('should compute A* route', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/route/a-star?from=node_a&to=node_c')
         .expect(200)
@@ -372,8 +363,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should compute Dijkstra route', function () {
-      seedGraph();
+    it('should compute Dijkstra route', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/route/dijkstra?from=node_a&to=node_c')
         .expect(200)
@@ -386,8 +377,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should return 404 when no path exists', function () {
-      seedGraph();
+    it('should return 404 when no path exists', async function () {
+      await seedGraph();
       return request(app)
         .get('/api/route/a-star?from=node_a&to=node_a')
         .expect(200); // start === end IS a valid path
@@ -438,8 +429,8 @@ describe('API (auth enabled)', function () {
         .expect(400);
     });
 
-    it('should return 409 for duplicate id', function () {
-      seedGraph();
+    it('should return 409 for duplicate id', async function () {
+      await seedGraph();
       return request(app)
         .post('/api/nodes')
         .set('x-api-key', 'test-key-456')
@@ -456,8 +447,8 @@ describe('API (auth enabled)', function () {
         .expect(401);
     });
 
-    it('should create an edge with valid API key', function () {
-      seedGraph();
+    it('should create an edge with valid API key', async function () {
+      await seedGraph();
       return request(app)
         .post('/api/edges')
         .set('x-api-key', 'test-key-456')
@@ -470,8 +461,8 @@ describe('API (auth enabled)', function () {
         });
     });
 
-    it('should return 400 for missing fields', function () {
-      seedGraph();
+    it('should return 400 for missing fields', async function () {
+      await seedGraph();
       return request(app)
         .post('/api/edges')
         .set('x-api-key', 'test-key-456')
@@ -479,8 +470,8 @@ describe('API (auth enabled)', function () {
         .expect(400);
     });
 
-    it('should return 404 for unknown node', function () {
-      seedGraph();
+    it('should return 404 for unknown node', async function () {
+      await seedGraph();
       return request(app)
         .post('/api/edges')
         .set('x-api-key', 'test-key-456')
@@ -497,24 +488,22 @@ describe('API (auth enabled)', function () {
         .expect(401);
     });
 
-    it('should create a POI with valid API key', function () {
-      seedGraph();
-      return request(app)
+    it('should create a POI with valid API key', async function () {
+      await seedGraph();
+      const res = await request(app)
         .post('/api/pois')
         .set('x-api-key', 'test-key-456')
         .send({ name: 'New POI', node_id: 'node_a' })
-        .expect(201)
-        .then(function (res) {
-          assert.strictEqual(res.body.name, 'New POI');
-          // Verify it was persisted
-          var pois = db.queryAll('SELECT * FROM pois');
-          var match = pois.filter(function (p) { return p.name === 'New POI'; });
-          assert.strictEqual(match.length, 1);
-        });
+        .expect(201);
+      assert.strictEqual(res.body.name, 'New POI');
+      // Verify it was persisted
+      const pois = await db.queryAll('SELECT * FROM pois');
+      const match = pois.filter(function (p) { return p.name === 'New POI'; });
+      assert.strictEqual(match.length, 1);
     });
 
-    it('should return 404 for unknown node', function () {
-      seedGraph();
+    it('should return 404 for unknown node', async function () {
+      await seedGraph();
       return request(app)
         .post('/api/pois')
         .set('x-api-key', 'test-key-456')
@@ -585,8 +574,8 @@ describe('API (auth enabled)', function () {
         .expect(401);
     });
 
-    it('should update a node name', function () {
-      seedGraph();
+    it('should update a node name', async function () {
+      await seedGraph();
       return request(app)
         .put('/api/nodes/node_a')
         .set('x-api-key', 'test-key-456')
@@ -614,11 +603,10 @@ describe('API (auth enabled)', function () {
         .expect(401);
     });
 
-    it('should update edge surface type', function () {
-      seedGraph();
-      // Need to know the edge id — edges table has autoincrement
-      var edges = db.queryAll('SELECT * FROM edges');
-      var edgeId = edges[0].id;
+    it('should update edge surface type', async function () {
+      await seedGraph();
+      const edges = await db.queryAll('SELECT * FROM edges');
+      const edgeId = edges[0].id;
       return request(app)
         .put('/api/edges/' + edgeId)
         .set('x-api-key', 'test-key-456')
@@ -643,17 +631,17 @@ describe('API (auth enabled)', function () {
       return request(app).delete('/api/edges/1').expect(401);
     });
 
-    it('should delete an edge', function () {
-      seedGraph();
-      var edges = db.queryAll('SELECT * FROM edges');
-      var edgeId = edges[0].id;
+    it('should delete an edge', async function () {
+      await seedGraph();
+      const edges = await db.queryAll('SELECT * FROM edges');
+      const edgeId = edges[0].id;
       return request(app)
         .delete('/api/edges/' + edgeId)
         .set('x-api-key', 'test-key-456')
         .expect(200)
-        .then(function (res) {
+        .then(async function (res) {
           assert.strictEqual(res.body.deleted, edgeId);
-          assert.strictEqual(db.queryAll('SELECT * FROM edges').length, edges.length - 1);
+          assert.strictEqual((await db.queryAll('SELECT * FROM edges')).length, edges.length - 1);
         });
     });
 
@@ -672,19 +660,19 @@ describe('API (auth enabled)', function () {
         .expect(401);
     });
 
-    it('should cascade-delete a node, its edges, and POIs', function () {
-      seedGraph();
+    it('should cascade-delete a node, its edges, and POIs', async function () {
+      await seedGraph();
       return request(app)
         .delete('/api/nodes/node_c')
         .set('x-api-key', 'test-key-456')
         .expect(200)
-        .then(function (res) {
+        .then(async function (res) {
           assert.strictEqual(res.body.deleted, 'node_c');
           // POI should be gone
-          var pois = db.queryAll('SELECT * FROM pois');
+          const pois = await db.queryAll('SELECT * FROM pois');
           assert.strictEqual(pois.length, 0);
           // Edges referencing node_c should be gone
-          var edges = db.queryAll('SELECT * FROM edges');
+          const edges = await db.queryAll('SELECT * FROM edges');
           assert.strictEqual(edges.length, 1); // only a→b remains
         });
     });
@@ -704,17 +692,17 @@ describe('API (auth enabled)', function () {
         .expect(401);
     });
 
-    it('should delete a POI', function () {
-      seedGraph();
-      var pois = db.queryAll('SELECT * FROM pois');
-      var poiId = pois[0].id;
+    it('should delete a POI', async function () {
+      await seedGraph();
+      const pois = await db.queryAll('SELECT * FROM pois');
+      const poiId = pois[0].id;
       return request(app)
         .delete('/api/pois/' + poiId)
         .set('x-api-key', 'test-key-456')
         .expect(200)
-        .then(function (res) {
+        .then(async function (res) {
           assert.strictEqual(res.body.deleted, poiId);
-          assert.strictEqual(db.queryAll('SELECT * FROM pois').length, 0);
+          assert.strictEqual((await db.queryAll('SELECT * FROM pois')).length, 0);
         });
     });
 

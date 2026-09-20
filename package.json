@@ -10,9 +10,10 @@
     "test": "mocha test/router.test.js test/server.test.js"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^4.21.0",
     "express-rate-limit": "^8.5.2",
-    "sql.js": "^1.11.0"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "mocha": "^12.0.2",

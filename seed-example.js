@@ -62,13 +62,13 @@ const pois = [
 async function seed() {
   await getDb();
   console.log('Clearing existing data…');
-  execute('DELETE FROM pois');
-  execute('DELETE FROM edges');
-  execute('DELETE FROM nodes');
+  await execute('DELETE FROM pois');
+  await execute('DELETE FROM edges');
+  await execute('DELETE FROM nodes');
 
   console.log('Inserting nodes…');
   for (const n of nodes) {
-    execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)', [
+    await execute('INSERT INTO nodes (id, name, lat, lng, type) VALUES (?, ?, ?, ?, ?)', [
       n.id, n.name, n.lat, n.lng, n.type
     ]);
   }
@@ -78,14 +78,14 @@ async function seed() {
     const a = nodes.find((n) => n.id === from);
     const b = nodes.find((n) => n.id === to);
     const weight = haversine(a.lat, a.lng, b.lat, b.lng);
-    execute('INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)', [
+    await execute('INSERT INTO edges (from_node_id, to_node_id, weight, surface_type) VALUES (?, ?, ?, ?)', [
       from, to, weight, surface
     ]);
   }
 
   console.log('Inserting POIs…');
   for (const p of pois) {
-    execute('INSERT INTO pois (name, node_id) VALUES (?, ?)', [p.name, p.node_id]);
+    await execute('INSERT INTO pois (name, node_id) VALUES (?, ?)', [p.name, p.node_id]);
   }
 
   console.log(`Done — ${nodes.length} nodes, ${edgeDefs.length} edges, ${pois.length} POIs.`);
