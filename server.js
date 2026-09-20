@@ -24,9 +24,13 @@ if (process.env.TRUST_PROXY) {
 // origins, so the browser needs an explicit CORS allow-list. Comma-
 // separate multiple origins (e.g. a production domain + Vercel preview
 // URLs). Leave unset to allow any origin (fine for local dev).
+// A browser's Origin header never has a trailing slash, but it's an
+// easy copy-paste mistake to include one here (and cors() does an
+// exact string match) — strip it so that mistake doesn't silently
+// break every cross-origin request.
 const corsOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
-  .map((s) => s.trim())
+  .map((s) => s.trim().replace(/\/+$/, ''))
   .filter(Boolean);
 app.use(cors({ origin: corsOrigins.length > 0 ? corsOrigins : true }));
 
