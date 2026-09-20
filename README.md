@@ -225,7 +225,9 @@ When exceeded the server returns `{ "error": "Too many requests — try again la
 
 ### 1. Database — Supabase
 1. Create a project at [supabase.com](https://supabase.com).
-2. Go to **Project Settings → Database → Connection string** and copy the URI (session pooler or direct connection — not the transaction pooler, since this app runs real `BEGIN`/`COMMIT` transactions for survey saves).
+2. Go to **Project Settings → Database → Connection string** and copy the URI from the **"Session pooler"** tab specifically (hostname contains `.pooler.supabase.com`). Do not use:
+   - **"Direct connection"** (`db.<project-ref>.supabase.co`) — this is IPv6-only, and most hosts (Render, Vercel, GitHub Actions, etc.) have no outbound IPv6 route, so it fails immediately with `ENETUNREACH`.
+   - **"Transaction pooler"** (port 6543) — this app runs real multi-statement `BEGIN`/`COMMIT` transactions for survey saves, which transaction-mode pooling can break.
 3. That string is your `DATABASE_URL`. The app creates its own tables on first startup (`CREATE TABLE IF NOT EXISTS …` in [`database.js`](database.js)) — no manual migration step needed.
 
 ### 2. Backend — Render

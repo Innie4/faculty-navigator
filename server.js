@@ -473,6 +473,18 @@ if (require.main === module) {
     .then(() => app.listen(PORT))
     .catch((err) => {
       console.error('Failed to start:', err.message);
+      if (err.code === 'ENETUNREACH' && /:.*:.*:.*:.*:.*:5432/.test(err.message)) {
+        console.error(
+          '\nHint: that address looks like IPv6, and this host likely has no ' +
+          'outbound IPv6 route (true on Render, and several other platforms).\n' +
+          "Supabase's *direct* connection host (db.<project-ref>.supabase.co) " +
+          'is IPv6-only. Switch DATABASE_URL to the Session pooler connection ' +
+          'string instead — Supabase dashboard → Project Settings → Database → ' +
+          'Connection string → "Session pooler" — which is IPv4-reachable and ' +
+          'still supports this app\'s BEGIN/COMMIT transactions (the Transaction ' +
+          "pooler does not, so don't use that one either).\n"
+        );
+      }
       process.exit(1);
     });
 }
