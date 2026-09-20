@@ -8,6 +8,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY || null; // null = auth disabled
 
+// When deployed behind a reverse proxy (Render, Railway, Heroku, nginx),
+// Express must be told which hop(s) to trust so it reads the real client
+// IP from X-Forwarded-For instead of the proxy's IP. Without this,
+// express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and — if
+// ignored — buckets every visitor behind the same proxy IP together.
+// Leave TRUST_PROXY unset for local development.
+if (process.env.TRUST_PROXY) {
+  const numeric = Number(process.env.TRUST_PROXY);
+  app.set('trust proxy', Number.isNaN(numeric) ? process.env.TRUST_PROXY : numeric);
+}
+
 /* ─── Rate limiters ───────────────────────────────────────── */
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

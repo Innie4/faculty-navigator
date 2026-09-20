@@ -174,6 +174,7 @@ No code changes are needed — the A\* algorithm works on any connected graph.
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | HTTP server port |
+| `TRUST_PROXY` | *(unset)* | Set when deployed behind a reverse proxy (Render, Railway, Heroku, nginx) — e.g. `1` — so express-rate-limit reads the real client IP instead of the proxy's |
 | `FACULTY_DB_PATH` | `./faculty.db` | Path to the SQLite database file |
 | `API_KEY` | *(unset)* | If set, all POST / PUT / DELETE endpoints require `x-api-key` header |
 
