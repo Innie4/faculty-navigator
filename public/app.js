@@ -9,8 +9,15 @@
 let map, graph, pois, currentPosMarker, routePolyline, destMarker;
 let currentPos = null;
 let activeDestNodeId = null;
+let activeDestName = '';
 let directionsSteps = null;
 let currentAlgorithm = 'a-star';
+/* Dynamic search connector: direct line from user → destination + live metres */
+let guidanceLine = null;
+let guidanceLabel = null;
+let lastRouteDistance = null;
+let lastRouteAt = 0;
+let lastRoutePos = null;
 
 /* ─── Config ───────────────────────────────────────────────── */
 const DEFAULT_CENTER = [5.0315, 7.9208];
@@ -178,7 +185,27 @@ function onPositionUpdate(pos) {
     setGpsState('poor');
   }
 
-  if (activeDestNodeId) recalculateRoute();
+  /* Always refresh the dynamic connector + live metres instantly (no network). */
+  if (activeDestNodeId) updateGuidanceLine();
+
+  /* Throttle backend route recalcs: at most every 5 s unless moved > 10 m. */
+  if (activeDestNodeId) {
+    const now = Date.now();
+    const moved = lastRoutePos
+      ? haversineDistance(lastRoutePos.lat, lastRoutePos.lng, latitude, longitude)
+      : Infinity;
+    if (now - lastRouteAt > 5000 || moved > 10) {
+      lastRouteAt = now;
+      lastRoutePos = { lat: latitude, lng: longitude };
+      recalculateRoute();
+    }
+  } else if (currentPos && !activeDestNodeId && map) {
+    /* No destination yet — keep the user in view on first fix. */
+    if (!onPositionUpdate._centred) {
+      map.setView([latitude, longitude], Math.max(map.getZoom(), 17));
+      onPositionUpdate._centred = true;
+    }
+  }
 }
 
 function onGpsError(err) {
@@ -199,16 +226,20 @@ async function fetchRoute(fromId, toId) {
 
 /* ─── Recalculate route from current position ──────────────── */
 async function recalculateRoute() {
+  if (!currentPos) return;
   const nearest = findNearestNode(currentPos.lat, currentPos.lng, graph.nodes);
   if (!nearest) return;
 
   const data = await fetchRoute(nearest.id, activeDestNodeId);
   if (data) {
+    lastRouteDistance = data.distance;
     drawRoute(data);
-    distanceEl.textContent = Math.round(data.distance) + ' m';
   } else {
-    statusEl.textContent = 'No route from your position.';
+    lastRouteDistance = null;
+    statusEl.textContent = 'No walking path — showing direct line to destination.';
   }
+  /* Re-render the dynamic connector so the live metres stay in sync. */
+  updateGuidanceLine();
 }
 
 /* ─── Search box handler ───────────────────────────────────── */
@@ -245,6 +276,8 @@ async function selectDestination(nodeId, name) {
   $('results-list').innerHTML = '';
 
   activeDestNodeId = nodeId;
+  activeDestName = name;
+  lastRouteDistance = null;
 
   const destNode = graph.nodes.find((n) => n.id === nodeId);
   if (destNode) {
@@ -260,24 +293,99 @@ async function selectDestination(nodeId, name) {
     destMarker.bindTooltip(name);
   }
 
+  /* Draw the dynamic connecting line immediately — even before the
+     backend route returns — so search always gives instant direction. */
+  updateGuidanceLine();
+
   if (currentPos) {
     const nearest = findNearestNode(currentPos.lat, currentPos.lng, graph.nodes);
     if (!nearest) {
-      statusEl.textContent = 'No nearest node found.';
+      statusEl.textContent = 'No nearest node found — showing direct line.';
       return;
     }
 
     const result = await fetchRoute(nearest.id, nodeId);
     if (result) {
+      lastRouteDistance = result.distance;
+      lastRouteAt = Date.now();
+      lastRoutePos = { lat: currentPos.lat, lng: currentPos.lng };
       drawRoute(result);
-      distanceEl.textContent = Math.round(result.distance) + ' m';
       statusEl.textContent = 'Route to ' + name + ' (' + currentAlgorithm + ')';
     } else {
-      statusEl.textContent = 'No route found — disconnected?';
+      lastRouteDistance = null;
+      statusEl.textContent = 'No walking path — follow the direct line to ' + name + '.';
       distanceEl.textContent = '';
+      if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+      /* Keep the map framed on user + destination when no graph path exists. */
+      if (currentPos && destNode) {
+        map.fitBounds(L.latLngBounds(
+          [[currentPos.lat, currentPos.lng], [destNode.lat, destNode.lng]]
+        ).pad(0.2));
+      }
     }
+    updateGuidanceLine();
   } else {
     statusEl.textContent = 'Selected ' + name + '. Waiting for GPS…';
+    if (destNode) map.setView([destNode.lat, destNode.lng], Math.max(map.getZoom(), 17));
+  }
+}
+
+/* ─── Dynamic connecting line + live distance (metres) ─────────
+ * Draws a dashed straight line from the live GPS position to the
+ * selected destination and updates the metres readout on every GPS
+ * tick. This runs fully client-side (Haversine) so it stays dynamic
+ * even when the backend route is slow, throttled, or disconnected.
+ */
+function getDestNode() {
+  if (!activeDestNodeId || !graph) return null;
+  return graph.nodes.find((n) => n.id === activeDestNodeId) || null;
+}
+
+function formatLiveDistance(metres) {
+  const m = Math.max(0, Math.round(metres));
+  return m.toLocaleString('en-US') + ' m';
+}
+
+function updateGuidanceLine() {
+  const dest = getDestNode();
+  if (!dest || !currentPos || !map) return;
+
+  const userLL = [currentPos.lat, currentPos.lng];
+  const destLL = [dest.lat, dest.lng];
+  const liveMetres = haversineDistance(currentPos.lat, currentPos.lng, dest.lat, dest.lng);
+
+  if (!guidanceLine) {
+    guidanceLine = L.polyline([userLL, destLL], {
+      color: '#1c1c1c', weight: 2, opacity: 0.85, dashArray: '8 8'
+    }).addTo(map);
+  } else {
+    guidanceLine.setLatLngs([userLL, destLL]);
+  }
+
+  /* Live label pinned at the midpoint of the connector. */
+  const mid = [(userLL[0] + destLL[0]) / 2, (userLL[1] + destLL[1]) / 2];
+  const labelText = '📍 ' + formatLiveDistance(liveMetres);
+  if (!guidanceLabel) {
+    guidanceLabel = L.tooltip({
+      permanent: true, direction: 'center', className: 'guidance-label', opacity: 1
+    }).setLatLng(mid).setContent(labelText).addTo(map);
+  } else {
+    guidanceLabel.setLatLng(mid).setContent(labelText);
+  }
+
+  /* Arrival state (< 15 m): celebrate instead of routing. */
+  if (liveMetres < 15) {
+    distanceEl.textContent = formatLiveDistance(liveMetres) + ' — ARRIVED 🎉';
+    statusEl.textContent = 'You have arrived at ' + (activeDestName || dest.name || 'your destination') + ' 🎉';
+    return;
+  }
+
+  /* Normal state: live straight-line metres, plus walking-route metres when known. */
+  if (lastRouteDistance != null) {
+    distanceEl.textContent =
+      '📍 ' + formatLiveDistance(liveMetres) + ' away • route ' + formatLiveDistance(lastRouteDistance);
+  } else {
+    distanceEl.textContent = '📍 ' + formatLiveDistance(liveMetres) + ' away';
   }
 }
 
@@ -290,7 +398,9 @@ function drawRoute(result) {
     color: '#d94f14', weight: 4, opacity: 0.85
   }).addTo(map);
 
+  /* Frame the walking route; the guidance connector refreshes on top of it. */
   map.fitBounds(routePolyline.getBounds().pad(0.1));
+  updateGuidanceLine();
 
   /* Generate & display directions */
   directionsSteps = generateDirections(result.path);
@@ -334,7 +444,12 @@ function toggleDirectionsPanel() {
 function clearRoute() {
   if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
   if (destMarker)    { map.removeLayer(destMarker);    destMarker = null; }
+  if (guidanceLine)  { map.removeLayer(guidanceLine);  guidanceLine = null; }
+  if (guidanceLabel) { map.removeLayer(guidanceLabel); guidanceLabel = null; }
   activeDestNodeId = null;
+  activeDestName = '';
+  lastRouteDistance = null;
+  lastRoutePos = null;
   directionsSteps = null;
 
   $('directions-list').innerHTML = '';

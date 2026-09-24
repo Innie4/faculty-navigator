@@ -917,6 +917,22 @@ body.navigate {
   text-shadow: 0 1px 2px rgba(0,0,0,0.35);
 }
 
+/* — Live guidance connector label (dynamic metres readout) — */
+.guidance-label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  background: var(--color-text);
+  color: var(--color-surface);
+  border: 2px solid var(--color-surface);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 0 rgba(28,28,28,0.55);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.guidance-label::before { display: none; }
+
 /* ============================================================
    6.  SURVEY PAGE
    ============================================================ */
