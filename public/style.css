@@ -1619,6 +1619,11 @@ body.survey { padding: 0; }
   padding-right: 40px;
 }
 
+/* — "1 · NAME IT" section bottom spacing (admin building form) — */
+.building-form #b-name {
+  margin-bottom: var(--space-md);
+}
+
 .coord-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
